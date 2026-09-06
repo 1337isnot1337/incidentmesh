@@ -43,16 +43,16 @@
     <text x="222" y="267" fill="#b0c1cc" font-size="18">common three-way provider-call overlap</text>
     <path d="M40 291 H920" stroke="#30404b"/>
 
-    <g font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="16">
+    <g font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="15">
       <text x="40" y="334" fill="#b0c1cc">rollback_production</text>
-      <text x="270" y="334" fill="#ffb18a">SafetyGateInterception</text>
-      <text x="540" y="334" fill="#8ee3c7">request_corroboration</text>
-      <text x="784" y="334" fill="#b0c1cc">provider follow-up</text>
+      <text x="250" y="334" fill="#ffb18a">SafetyGateInterception</text>
+      <text x="515" y="334" fill="#8ee3c7">request_corroboration</text>
+      <text x="920" y="334" text-anchor="end" fill="#b0c1cc">provider follow-up</text>
     </g>
     <g fill="none" stroke="#708794" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M215 328 H252 M246 322 L252 328 L246 334"/>
-      <path d="M501 328 H530 M524 322 L530 328 L524 334"/>
-      <path d="M750 328 H770 M764 322 L770 328 L764 334"/>
+      <path d="M202 328 H234 M228 322 L234 328 L228 334"/>
+      <path d="M462 328 H498 M492 322 L498 328 L492 334"/>
+      <path d="M706 328 H738 M732 322 L738 328 L732 334"/>
     </g>
 
     <text x="40" y="374" fill="#708794" font-size="15">Authenticated receipt source commit 65d98f8 · no production mutation · not a final-SHA provider run</text>
