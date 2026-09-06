@@ -1,64 +1,122 @@
-# IncidentMesh — 80-second judge recording plan
+# IncidentMesh demo and verification
 
-The video has one central idea: other agents changed the evidence while the Action Controller was thinking, so IncidentMesh knew its plan was no longer valid.
+The final demo is the fastest way to understand the project:
 
-## 0–9 seconds — problem
+**[Watch the 83-second IncidentMesh demo on YouTube](https://www.youtube.com/watch?v=ohw8Ybt_dIM)**
 
-**Visual:** `docs/gallery/jigjoy-01-cover.png`, full frame.
+The video shows one central idea: peer evidence can change while the Action Controller is still planning, making an older plan stale before it reaches the action boundary.
 
-> Incident response gets dangerous when partial evidence can trigger action. IncidentMesh runs independent investigators concurrently and versions the evidence behind every mitigation plan.
+## What the video shows
 
-## 9–31 seconds — stale-plan causal race
+1. **Revision-stamped planning.** Trace, Dependency, and Impact investigate concurrently while the Action Controller may already be planning against the current evidence revision.
+2. **A controlled stale-plan race.** The same revision-1 bounded plan is replayed under concurrent and serialized scheduling. Concurrent peer progress advances state to revision 3 before the proposal returns, so the proposal is stale. Serialized peers leave the same proposal fresh at that boundary. Destructive rollback remains unauthorized in both arms.
+3. **Historical authenticated provider evidence.** A Google `gemini-3.5-flash-lite` receipt records all three responder provider calls simultaneously in flight for **1,389 ms**, followed by an Action Controller `rollback_production` proposal, real Mozaik `SafetyGateInterception`, `request_corroboration` execution, and a provider follow-up.
+4. **Seeded safety stress.** 10,000 generated cases / 40,000 immutable action attempts record zero unauthorized rollback crossings and zero stale non-safe crossings.
 
-**Visual:** `docs/evidence/stale-plan-ablation.md`, tightly cropped to the comparison table, or settled output from `npm run ablation:stale-plan`.
+The video uses proposal-only actions and does not modify a production system.
 
-> Both Action Controllers begin the same bounded plan at revision one. Concurrently, Dependency and Impact finish while that planner is running, advancing authoritative state to revision three. When the revision-one proposal returns, IncidentMesh marks it stale, Mozaik rewrites it to corroboration, and a fresh replan sees the conflict. Serialized peers have not advanced state, so that same bounded proposal is still fresh and crosses before the identical later evidence arrives.
+## Run the default demo
 
-Keep these rows readable:
-
-```text
-                         CONCURRENT     SEQUENTIAL
-planning revision        1              1
-boundary revision        3              1
-proposal fresh           no             yes
-bounded action crosses   no             yes
-later evidence           same           same
-```
-
-The bounded canary is proposal-only. Never describe this as serialized rollback crossing.
-
-## 31–47 seconds — authenticated provider execution
-
-**Visual:** `docs/evidence/real-provider-run.md`, cropped to provider/model, overlap, and Phase-2 result.
-
-> The inputs are not invented for the counterfactual. This historical authenticated Gemini Flash-Lite run records three real responder calls overlapping for 1,389 milliseconds. It then records Gemini proposing rollback, real SafetyGateInterception, request_corroboration executing, and a provider follow-up.
-
-Do not imply that the historical provider run used the later revision architecture. Its structured hypotheses are frozen and replayed by the final runtime.
-
-## 47–62 seconds — hard action boundary
-
-**Visual:** stable lines from:
+Node.js 20+ is required. The default demo is deterministic and does not need a provider key.
 
 ```bash
-npm run demo | grep -E 'action boundary|interception|rollback_production|request_corroboration|safe-executed'
+npm ci
+npm run demo
 ```
 
-> Every bounded or destructive proposal gets its own immutable attempt snapshot. Rollback passes only when that specific snapshot is fresh and affirmatively approved. Here conflicting evidence blocks it, Mozaik rewrites it, and the safe tool executes. No fixture touches production.
+Look for the action-boundary path:
 
-## 62–74 seconds — adversarial proof and symmetry
+```text
+rollback_production
+        |
+        v
+SafetyGateInterception
+        |
+        v
+request_corroboration
+```
 
-**Visual:** `docs/evidence/safety-stress.md`, cropped to counts and zeros.
+Readable deterministic evidence: [`evidence/replay.md`](evidence/replay.md) and [`evidence/replay.svg`](evidence/replay.svg).
 
-> This is not an always-block gate. Complete consistent evidence passes the proposal-only rollback path. Across 10,000 seeded schedules and 40,000 independent attempts, unauthorized rollback crossings, stale non-safe crossings, policy mismatches, and snapshot mutations are all zero.
+## Reproduce the causal scheduling comparison
 
-## 74–82 seconds — close
+```bash
+npm run ablation:stale-plan
+```
 
-**Visual:** return to the cover or the stale-plan table.
+The experiment holds the incident, eventual evidence, planner, policy, target, candidate action, and configured planner-fixture duration constant. Only peer-evidence scheduling changes.
 
-> Concurrency does not just make IncidentMesh faster. It changes which decisions are still valid.
+```text
+CONCURRENT                         SERIALIZED
 
-## Recording discipline
+plan starts @ rev 1               plan starts @ rev 1
+peers advance state               peers wait
+boundary @ rev 3                  boundary @ rev 1
 
-Pre-run terminal commands. Narrate only after output is stable. Keep tool names and revision rows legible. If the cut is long, remove pauses before speaking faster. Do not add an architecture tour, install sequence, benchmark, or extra scenario.
+same rev-1 proposal returns       same rev-1 proposal returns
+STALE                              FRESH
 
-Never claim real production mutation, production readiness, MTTR improvement, dynamic mutation of in-flight prompts, or that sequential scheduling permits destructive rollback.
+request_corroboration             targeted_canary_probe
++ fresh replan                    proposal-only diagnostic
+```
+
+Destructive rollback remains blocked in both arms.
+
+Readable result: [`evidence/stale-plan-ablation.md`](evidence/stale-plan-ablation.md)
+
+Raw result: [`evidence/stale-plan-ablation.json`](evidence/stale-plan-ablation.json)
+
+## Inspect the authenticated Gemini receipt
+
+The historical provider execution is preserved separately from the deterministic counterfactual.
+
+- Trace: 2 -> 1,392 ms
+- Dependency: 3 -> 1,584 ms
+- Impact: 3 -> 1,468 ms
+- **1,389 ms common three-way provider-call overlap**
+- 3 / 3 structured hypotheses
+- `BLOCKED -- conflicting-evidence`
+- Action Controller proposes `rollback_production`
+- Mozaik rewrites it to `request_corroboration`
+- the safe tool executes
+- the provider records a follow-up recommendation
+
+Readable receipt: [`evidence/real-provider-run.md`](evidence/real-provider-run.md)
+
+Raw receipt: [`evidence/real-provider-run.json`](evidence/real-provider-run.json)
+
+This is one authenticated historical run from its recorded source commit. It is not presented as final-SHA provider evidence or as proof of simultaneous token generation inside the model server.
+
+## Run the safety stress
+
+```bash
+npm run stress:safety
+```
+
+The committed seeded receipt contains:
+
+```text
+10,000 generated cases
+40,000 immutable action attempts
+
+0 unauthorized rollback crossings
+0 stale non-safe crossings
+0 unauthorized bounded crossings
+0 policy violations
+0 attempt-isolation violations
+0 snapshot-mutation violations
+```
+
+Readable receipt: [`evidence/safety-stress.md`](evidence/safety-stress.md)
+
+## Run the full verification suite
+
+```bash
+npm run verify
+```
+
+For the shortest judge-oriented walkthrough, see [`judge-guide.md`](judge-guide.md).
+
+## Scope
+
+IncidentMesh is a hackathon prototype. `targeted_canary_probe` and `rollback_production` are proposal-only fixtures. No demonstrated tool mutates production. The project does not claim production readiness, MTTR improvement, generic speedup, dynamic modification of prompts already in flight, or serialized destructive rollback crossing.
