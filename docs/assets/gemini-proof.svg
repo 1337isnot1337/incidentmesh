@@ -1,74 +1,60 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="960" height="380" viewBox="0 0 960 380" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="400" viewBox="0 0 960 400" role="img" aria-labelledby="title desc">
   <title id="title">Authenticated Gemini provider run</title>
   <desc id="desc">Historical authenticated Gemini Flash-Lite receipt. Trace, Dependency, and Impact provider calls overlap for 1,389 milliseconds. The same run records rollback_production being intercepted by SafetyGateInterception and rewritten to request_corroboration before provider follow-up.</desc>
-  <rect width="960" height="380" rx="16" fill="#101820"/>
-
+  <rect width="960" height="400" rx="16" fill="#101820"/>
   <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
     <text x="40" y="48" fill="#f0f5f7" font-size="25" font-weight="700">One authenticated Gemini run</text>
     <text x="920" y="48" text-anchor="end" fill="#b0c1cc" font-size="17">gemini-3.5-flash-lite · historical receipt</text>
 
     <g font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="14" fill="#708794">
-      <text x="230" y="82" text-anchor="middle">0</text>
-      <text x="393" y="82" text-anchor="middle">400</text>
-      <text x="555" y="82" text-anchor="middle">800</text>
-      <text x="718" y="82" text-anchor="middle">1200</text>
-      <text x="880" y="82" text-anchor="middle">1600 ms</text>
+      <text x="220" y="82" text-anchor="middle">0</text>
+      <text x="355" y="82" text-anchor="middle">400</text>
+      <text x="490" y="82" text-anchor="middle">800</text>
+      <text x="625" y="82" text-anchor="middle">1200</text>
+      <text x="760" y="82" text-anchor="middle">1600 ms</text>
     </g>
-
     <g stroke="#30404b" stroke-width="1">
-      <path d="M230 90 V228"/>
-      <path d="M393 90 V228"/>
-      <path d="M555 90 V228"/>
-      <path d="M718 90 V228"/>
-      <path d="M880 90 V228"/>
+      <path d="M220 90 V228"/><path d="M355 90 V228"/><path d="M490 90 V228"/><path d="M625 90 V228"/><path d="M760 90 V228"/>
     </g>
 
-    <rect x="231" y="94" width="565" height="126" rx="8" fill="#72d5c2" opacity="0.07"/>
-    <path d="M231 94 V220" stroke="#72d5c2" stroke-width="2" opacity="0.45"/>
-    <path d="M796 94 V220" stroke="#72d5c2" stroke-width="2" opacity="0.45"/>
+    <rect x="221" y="94" width="469" height="126" rx="8" fill="#72d5c2" opacity="0.07"/>
+    <path d="M221 94 V220" stroke="#72d5c2" stroke-width="2" opacity="0.45"/>
+    <path d="M690 94 V220" stroke="#72d5c2" stroke-width="2" opacity="0.45"/>
 
     <g font-size="18" fill="#b0c1cc">
-      <text x="40" y="120">Trace</text>
-      <text x="40" y="170">Dependency</text>
-      <text x="40" y="220">Impact</text>
+      <text x="40" y="120">Trace</text><text x="40" y="170">Dependency</text><text x="40" y="220">Impact</text>
     </g>
-
     <g stroke="#72d5c2" stroke-width="12" stroke-linecap="round">
-      <path d="M231 114 H796"/>
-      <path d="M231 164 H874"/>
-      <path d="M231 214 H826"/>
+      <path d="M221 114 H690"/><path d="M221 164 H755"/><path d="M221 214 H715"/>
     </g>
-
     <g fill="#8ee3c7">
-      <circle cx="231" cy="114" r="7"/>
-      <circle cx="796" cy="114" r="7"/>
-      <circle cx="231" cy="164" r="7"/>
-      <circle cx="874" cy="164" r="7"/>
-      <circle cx="231" cy="214" r="7"/>
-      <circle cx="826" cy="214" r="7"/>
+      <circle cx="221" cy="114" r="7"/><circle cx="690" cy="114" r="7"/>
+      <circle cx="221" cy="164" r="7"/><circle cx="755" cy="164" r="7"/>
+      <circle cx="221" cy="214" r="7"/><circle cx="715" cy="214" r="7"/>
     </g>
 
     <g font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="16" fill="#f0f5f7">
-      <text x="920" y="120" text-anchor="end">2 → 1392 ms</text>
-      <text x="920" y="170" text-anchor="end">3 → 1584 ms</text>
-      <text x="920" y="220" text-anchor="end">3 → 1468 ms</text>
+      <text x="920" y="120" text-anchor="end">2–1392 ms</text>
+      <text x="920" y="170" text-anchor="end">3–1584 ms</text>
+      <text x="920" y="220" text-anchor="end">3–1468 ms</text>
     </g>
 
-    <text x="40" y="267" fill="#72d5c2" font-size="42" font-weight="760" letter-spacing="-1">1,389 ms</text>
-    <text x="222" y="264" fill="#b0c1cc" font-size="18">common three-way provider-call overlap</text>
+    <text x="40" y="270" fill="#72d5c2" font-size="42" font-weight="760" letter-spacing="-1">1,389 ms</text>
+    <text x="222" y="267" fill="#b0c1cc" font-size="18">common three-way provider-call overlap</text>
+    <path d="M40 291 H920" stroke="#30404b"/>
 
-    <path d="M40 286 H920" stroke="#30404b"/>
-
-    <g font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="18">
-      <text x="40" y="329" fill="#b0c1cc">rollback_production</text>
-      <text x="232" y="329" fill="#708794">→</text>
-      <text x="262" y="329" fill="#ffb18a">SafetyGateInterception</text>
-      <text x="500" y="329" fill="#708794">→</text>
-      <text x="530" y="329" fill="#8ee3c7">request_corroboration</text>
-      <text x="754" y="329" fill="#708794">→</text>
-      <text x="784" y="329" fill="#b0c1cc" font-size="16">provider follow-up</text>
+    <g font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="16">
+      <text x="40" y="334" fill="#b0c1cc">rollback_production</text>
+      <text x="270" y="334" fill="#ffb18a">SafetyGateInterception</text>
+      <text x="548" y="334" fill="#8ee3c7">request_corroboration</text>
+      <text x="798" y="334" fill="#b0c1cc">provider follow-up</text>
+    </g>
+    <g fill="none" stroke="#708794" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M215 328 H252 M246 322 L252 328 L246 334"/>
+      <path d="M501 328 H530 M524 322 L530 328 L524 334"/>
+      <path d="M752 328 H780 M774 322 L780 328 L774 334"/>
     </g>
 
-    <text x="40" y="357" fill="#708794" font-size="15">Authenticated receipt source commit 65d98f8 · no production mutation · not a final-SHA provider run</text>
+    <text x="40" y="374" fill="#708794" font-size="15">Authenticated receipt source commit 65d98f8 · no production mutation · not a final-SHA provider run</text>
   </g>
 </svg>
