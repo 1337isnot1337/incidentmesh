@@ -59,7 +59,7 @@ Both schedules eventually reach the **same three hypotheses, two contradictions,
 
 ## Demo
 
-The replay below is generated from a canonical run. Responder bars show measured overlap; the event ledger shows what followed the boundary decision.
+The replay below is generated from a canonical run. Responder bars show the canonical fixture overlap; the event ledger shows what followed the boundary decision. Live timings remain visible in `npm run demo`.
 
 [![Canonical replay: concurrent responder spans, blocked gate, interception, safe tool execution, canary replan, and corroboration](docs/evidence/replay.svg)](docs/evidence/replay.svg)
 

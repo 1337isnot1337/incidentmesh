@@ -1,13 +1,78 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { dirname, resolve } from "node:path"
-import { runIncidentScenario, type TimelineEvent } from "./app.js"
+import assert from "node:assert/strict"
+import { runIncidentScenario, type IncidentReport, type TimelineEvent } from "./app.js"
 
 const outputSvg = resolve(process.argv[2] ?? "docs/evidence/replay.svg")
 const outputJson = resolve(process.argv[3] ?? "docs/evidence/replay.json")
-// Optional source report lets presentation changes preserve captured evidence.
-const report: Awaited<ReturnType<typeof runIncidentScenario>> = process.argv[4]
-  ? JSON.parse(await readFile(resolve(process.argv[4]), "utf8"))
-  : await runIncidentScenario({ dryRun: true, scheduleMode: "concurrent", actionBoundaryMs: 205 })
+
+const canonicalizeReport = async (): Promise<IncidentReport> => {
+  if (process.argv[4]) return JSON.parse(await readFile(resolve(process.argv[4]), "utf8")) as IncidentReport
+
+  const liveReport = await runIncidentScenario({ dryRun: true, scheduleMode: "concurrent", actionBoundaryMs: 205 })
+  assert.equal(liveReport.gateDecision, "blocked")
+  assert.equal(liveReport.gateReason, "conflicting-evidence")
+  assert.equal(liveReport.hypotheses.length, 3)
+  assert.equal(liveReport.contradictions, 2)
+  assert.equal(liveReport.action.gateAtBoundary, "blocked")
+  assert.equal(liveReport.action.gateReasonAtBoundary, "conflicting-evidence")
+  assert.equal(liveReport.action.intercepted, true)
+  assert.equal(liveReport.action.executedTool, "request_corroboration")
+  assert.equal(liveReport.evidence.length, 2)
+
+  const canonicalTime = (item: TimelineEvent): number => {
+    if (item.type === "incident.opened" || item.type === "incident.span.started") return 0
+    if (item.type === "incident.action.proposed") return 45
+    if (item.type === "incident.hypothesis.emitted" && item.producer === "Trace") return 80
+    if (item.type === "incident.hypothesis.emitted" && item.producer === "Dependency") return 130
+    if (item.type === "incident.hypothesis.emitted" && item.producer === "Impact") return 180
+    if (item.type === "awareness.peer-observed" && item.detail.includes("trace hypothesis")) return 80
+    if (item.type === "awareness.peer-observed" && item.detail.includes("dependency hypothesis")) return 130
+    if (item.type === "awareness.peer-observed" && item.detail.includes("impact hypothesis")) return 180
+    if (item.type === "incident.span.completed" && item.producer === "Trace") return 118
+    if (item.type === "incident.span.completed" && item.producer === "Dependency") return 168
+    if (item.type === "incident.span.completed" && item.producer === "Impact") return 218
+    if (item.type === "incident.gate.decision" && item.detail.includes("evidence-aggregation")) return 180
+    if (item.type === "incident.action.execution-requested" || (item.type === "incident.gate.decision" && item.detail.includes("boundary hypotheses"))) return 205
+    if (item.type.startsWith("mozaik.interception.") || item.type.startsWith("mozaik.function-call.") || item.type === "incident.action.safe-executed") return 205
+    if (item.type === "incident.mitigation.replanned") return 240
+    if (item.type === "incident.evidence.added" && item.producer === "Trace") return 264
+    if (item.type === "incident.evidence.added" && item.producer === "Dependency") return 282
+    throw new Error(`no canonical replay timestamp for ${item.type} / ${item.producer} / ${item.detail}`)
+  }
+
+  return {
+    ...liveReport,
+    hypotheses: liveReport.hypotheses.map((item) => ({
+      ...item,
+      atMs: item.role === "trace" ? 80 : item.role === "dependency" ? 130 : 180,
+    })),
+    action: {
+      ...liveReport.action,
+      attemptedAtMs: 205,
+      actionableSafePlanAtMs: 205,
+      boundarySnapshot: liveReport.action.boundarySnapshot === null ? null : {
+        ...liveReport.action.boundarySnapshot,
+        atMs: 205,
+        availableRoles: [...liveReport.action.boundarySnapshot.availableRoles],
+        missingRequiredRoles: [...liveReport.action.boundarySnapshot.missingRequiredRoles],
+        degradedRoles: [...liveReport.action.boundarySnapshot.degradedRoles],
+      },
+    },
+    spans: liveReport.spans.map((span) => ({
+      ...span,
+      startedAtMs: 0,
+      completedAtMs: span.role === "trace" ? 118 : span.role === "dependency" ? 168 : 218,
+    })),
+    timeline: liveReport.timeline.map((item) => ({ ...item, atMs: canonicalTime(item) })),
+    elapsedMs: 282,
+  }
+}
+
+// The default path validates a live deterministic run, then writes canonicalized
+// fixture timestamps so committed replay evidence is byte-stable across hosts.
+// Passing a source report as argv[4] preserves that report's observed timings.
+const report = await canonicalizeReport()
 
 const esc = (value: string): string => value
   .replaceAll("&", "&amp;")
@@ -39,10 +104,10 @@ const spanLabel: Record<string, string> = { trace: "Trace", dependency: "Depende
 const height = 480 + keyEvents.length * 48
 const svg: string[] = []
 svg.push(`<svg xmlns="http://www.w3.org/2000/svg" width="960" height="${height}" viewBox="0 0 960 ${height}" role="img" aria-labelledby="title desc">`)
-svg.push(`<title id="title">IncidentMesh canonical replay</title><desc id="desc">Measured responder spans, configured timer and observed callback, followed by recorded action events. Source: companion replay.json.</desc>`)
+svg.push(`<title id="title">IncidentMesh canonical replay</title><desc id="desc">Canonicalized deterministic-fixture responder spans and action events. Source: companion replay.json; live timing remains available from npm run demo.</desc>`)
 svg.push(`<rect width="960" height="${height}" rx="16" fill="#101820"/><g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">`)
 svg.push(`<text x="40" y="56" fill="#f0f5f7" font-size="32" font-weight="700">Evidence arrives before the action.</text>`)
-svg.push(`<text x="40" y="92" fill="#b0c1cc" font-size="21">Canonical replay · measured time in milliseconds</text>`)
+svg.push(`<text x="40" y="92" fill="#b0c1cc" font-size="21">Canonical fixture replay · milliseconds</text>`)
 for (const span of report.spans) {
   const y = spanY[span.role]
   const end = span.completedAtMs ?? report.elapsedMs
@@ -56,7 +121,7 @@ svg.push(`<line x1="${boundaryX}" y1="126" x2="${boundaryX}" y2="337" stroke="#f
 svg.push(`<text x="${boundaryX - 12}" y="133" text-anchor="end" fill="#ffb18a" font-size="18">Configured: ${canonicalBoundaryMs} ms</text>`)
 svg.push(`<path d="M40 365 H920" stroke="#30404b"/>`)
 svg.push(`<text x="40" y="405" fill="#f0f5f7" font-size="25" font-weight="700">Action event ledger</text>`)
-svg.push(`<text x="920" y="405" text-anchor="end" fill="#b0c1cc" font-size="20">Observed callback: ${report.action.attemptedAtMs} ms</text>`)
+svg.push(`<text x="920" y="405" text-anchor="end" fill="#b0c1cc" font-size="20">Canonical boundary: ${report.action.attemptedAtMs} ms</text>`)
 keyEvents.forEach((item, index) => {
   const y = 456 + index * 48
   const color = item.key === "gate" ? "#ffb18a" : item.key === "safe" || item.key === "canary" || item.key.startsWith("evidence") ? "#8ee3c7" : "#e0e9ee"
