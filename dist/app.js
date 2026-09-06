@@ -1,4 +1,4 @@
-import { Agent, FunctionCallItem, RuntimeState, SemanticEvent, SituationSpecification, createAgent, createHuman, defineRuntime, } from "@mozaik-ai/core";
+import { Agent, FunctionCallItem, ModelMessageItem, RuntimeState, SemanticEvent, SituationSpecification, createAgent, createHuman, defineRuntime, } from "@mozaik-ai/core";
 export const INCIDENT_OPENED = "incident.opened";
 export const SPAN_STARTED = "incident.span.started";
 export const HYPOTHESIS_EMITTED = "incident.hypothesis.emitted";
@@ -6,6 +6,11 @@ export const SPAN_COMPLETED = "incident.span.completed";
 export const GATE_DECISION = "incident.gate.decision";
 export const MITIGATION_REPLANNED = "incident.mitigation.replanned";
 export const EVIDENCE_ADDED = "incident.evidence.added";
+export const ACTION_PROPOSED = "incident.action.proposed";
+export const ACTION_EXECUTION_REQUESTED = "incident.action.execution-requested";
+export const SAFE_ACTION_EXECUTED = "incident.action.safe-executed";
+export const RESPONDER_DEGRADED = "incident.responder.degraded";
+export const MITIGATION_PHASE_STARTED = "incident.mitigation.phase-started";
 export const ROLES = ["trace", "dependency", "impact"];
 export class IncidentState extends RuntimeState {
     incident = "checkout-api-us-east";
@@ -13,12 +18,26 @@ export class IncidentState extends RuntimeState {
     hypotheses = [];
     evidence = [];
     adaptations = [];
+    degradedRoles = [];
     spans = new Map();
     timeline = [];
+    scheduleMode = "concurrent";
     gateDecision = "pending";
     confidence = 0;
     contradictions = 0;
     followupRequested = false;
+    actionProposed = false;
+    actionAttemptStarted = false;
+    actionBoundaryMs = 205;
+    requestedActionTool = null;
+    actionAttemptedAtMs = null;
+    gateAtActionBoundary = null;
+    hypothesesAtActionBoundary = 0;
+    contradictionsAtActionBoundary = 0;
+    actionIntercepted = false;
+    actionExecutedTool = null;
+    mitigationPhaseStarted = false;
+    modelMitigationRecommendation = null;
     onTrace;
     changeListeners = new Set();
     notifyChange() {
@@ -54,19 +73,34 @@ export class IncidentState extends RuntimeState {
         this.notifyChange();
     }
     toReport() {
-        const spans = [...this.spans.values()].sort((a, b) => a.startedAtMs - b.startedAtMs);
+        const spans = [...this.spans.values()].map((span) => ({ ...span })).sort((a, b) => a.startedAtMs - b.startedAtMs);
         return {
             schema: "incidentmesh.report/v1",
             incident: this.incident,
+            scheduleMode: this.scheduleMode,
             phase: this.gateDecision === "blocked" ? "contained" : "investigating",
             gateDecision: this.gateDecision,
             confidence: Number(this.confidence.toFixed(2)),
             contradictions: this.contradictions,
-            hypotheses: [...this.hypotheses],
+            hypotheses: this.hypotheses.map((hypothesis) => ({ ...hypothesis })),
             evidence: [...this.evidence],
             adaptations: [...this.adaptations],
+            degradedRoles: [...this.degradedRoles],
+            action: {
+                proposed: this.actionProposed,
+                requestedTool: this.requestedActionTool,
+                boundaryMs: this.actionBoundaryMs,
+                attemptedAtMs: this.actionAttemptedAtMs,
+                gateAtBoundary: this.gateAtActionBoundary,
+                hypothesesAtBoundary: this.hypothesesAtActionBoundary,
+                contradictionsAtBoundary: this.contradictionsAtActionBoundary,
+                intercepted: this.actionIntercepted,
+                executedTool: this.actionExecutedTool,
+                mitigationPhaseStarted: this.mitigationPhaseStarted,
+                modelRecommendation: this.modelMitigationRecommendation,
+            },
             spans,
-            timeline: [...this.timeline],
+            timeline: this.timeline.map((item) => ({ ...item })),
             elapsedMs: Math.round(performance.now() - this.startedAt),
         };
     }
@@ -114,40 +148,52 @@ const ROLE_CONFIG = {
         rootCause: "regional-impact",
     },
 };
-const rollbackTool = {
-    type: "function",
-    name: "rollback_production",
-    description: "Propose a production rollback for the incident. Safety Gate may rewrite it.",
-    parameters: {
-        type: "object",
-        properties: { service: { type: "string" }, reason: { type: "string" } },
-        required: ["service", "reason"],
-        additionalProperties: false,
-    },
-    strict: true,
-    invoke: async (args) => ({
-        status: "proposal-only",
-        service: args.service,
-        reason: args.reason,
-    }),
-};
-export const requestCorroborationTool = {
-    type: "function",
-    name: "request_corroboration",
-    description: "Record that a proposed production action needs corroboration before it can proceed.",
-    parameters: {
-        type: "object",
-        properties: { originalAction: { type: "string" }, reason: { type: "string" } },
-        required: ["originalAction", "reason"],
-        additionalProperties: false,
-    },
-    strict: true,
-    invoke: async (args) => ({
-        status: "blocked-pending-corroboration",
-        originalAction: args.originalAction,
-        reason: args.reason,
-    }),
-};
+function createRollbackTool(onInvoke) {
+    return {
+        type: "function",
+        name: "rollback_production",
+        description: "Propose a production rollback for the incident. Safety Gate may rewrite it.",
+        parameters: {
+            type: "object",
+            properties: { service: { type: "string" }, reason: { type: "string" } },
+            required: ["service", "reason"],
+            additionalProperties: false,
+        },
+        strict: true,
+        invoke: async (args) => {
+            onInvoke?.(args);
+            return {
+                status: "proposal-only",
+                service: args.service,
+                reason: args.reason,
+            };
+        },
+    };
+}
+const rollbackTool = createRollbackTool();
+export function createRequestCorroborationTool(onInvoke) {
+    return {
+        type: "function",
+        name: "request_corroboration",
+        description: "Record that a proposed production action needs corroboration before it can proceed.",
+        parameters: {
+            type: "object",
+            properties: { originalAction: { type: "string" }, reason: { type: "string" } },
+            required: ["originalAction", "reason"],
+            additionalProperties: false,
+        },
+        strict: true,
+        invoke: async (args) => {
+            onInvoke?.(args);
+            return {
+                status: "blocked-pending-corroboration",
+                originalAction: args.originalAction,
+                reason: args.reason,
+            };
+        },
+    };
+}
+export const requestCorroborationTool = createRequestCorroborationTool();
 const responderTools = [rollbackTool, requestCorroborationTool];
 export class SafetyGateInterception {
     state;
@@ -165,7 +211,8 @@ export class SafetyGateInterception {
         }
         const functionCallTransition = transition;
         const call = functionCallTransition.input.call;
-        this.state.record("interception.rewrite", "Safety Gate", `constrained ${call.name} until corroboration`);
+        this.state.actionIntercepted = true;
+        this.state.record("mozaik.interception.rewritten", "Safety Gate", `rewrote ${call.name} -> request_corroboration`);
         const safeCall = FunctionCallItem.rehydrate({
             callId: call.callId,
             name: "request_corroboration",
@@ -222,7 +269,40 @@ const MODEL_HYPOTHESIS_OUTPUT = {
     },
     strict: true,
 };
-function responderHandlers(role, state, dryRun, model, maxOutputTokens, runLoop, sendEvent) {
+const RESPONDER_TAIL_MS = 38;
+function responderStartOffset(role, scheduleMode) {
+    if (scheduleMode === "concurrent" || role === "trace")
+        return 0;
+    const traceDuration = ROLE_CONFIG.trace.delay + RESPONDER_TAIL_MS;
+    if (role === "dependency")
+        return traceDuration;
+    return traceDuration + ROLE_CONFIG.dependency.delay + RESPONDER_TAIL_MS;
+}
+class DeterministicActionInferenceRunner {
+    async run(request) {
+        const hasToolOutput = request.context.getItems().some((item) => item.type === "function_call_output");
+        if (!hasToolOutput) {
+            return {
+                items: [FunctionCallItem.rehydrate({
+                        callId: "incidentmesh-deterministic-rollback",
+                        name: "rollback_production",
+                        args: JSON.stringify({ service: "checkout-api", reason: "restore service before action deadline" }),
+                    })],
+                tokenUsage: undefined,
+                rowResponse: { fixture: "rollback_proposal" },
+            };
+        }
+        return {
+            items: [ModelMessageItem.rehydrate({ text: "Action boundary resolved through safety control." })],
+            tokenUsage: undefined,
+            rowResponse: { fixture: "action_complete" },
+        };
+    }
+    async *stream(request) {
+        yield SemanticEvent.create("inference.output", "deterministic-action-runner", await this.run(request));
+    }
+}
+function responderHandlers(role, state, dryRun, scheduleMode, simulateDependencyTimeout, model, maxOutputTokens, runLoop, sendEvent) {
     const config = ROLE_CONFIG[role];
     const opened = {
         specification: isType(INCIDENT_OPENED),
@@ -232,13 +312,23 @@ function responderHandlers(role, state, dryRun, model, maxOutputTokens, runLoop,
                     return;
                 if (dryRun) {
                     void (async () => {
-                        sendEvent(event(SPAN_STARTED, participant.getId(), { role, detail: `${role} started independent investigation` }), participant.getId());
+                        const startOffset = responderStartOffset(role, scheduleMode);
+                        if (startOffset > 0)
+                            await sleep(startOffset);
+                        sendEvent(event(SPAN_STARTED, participant.getId(), { role, detail: `${role} started ${scheduleMode} investigation` }), participant.getId());
                         await sleep(config.delay);
+                        if (simulateDependencyTimeout && role === "dependency") {
+                            sendEvent(event(RESPONDER_DEGRADED, participant.getId(), {
+                                role, reason: "timeout", detail: "Dependency timed out before publishing a hypothesis",
+                            }), participant.getId());
+                            sendEvent(event(SPAN_COMPLETED, participant.getId(), { role, detail: "investigation ended without evidence: timeout" }), participant.getId());
+                            return;
+                        }
                         sendEvent(event(HYPOTHESIS_EMITTED, participant.getId(), {
-                            role, claim: config.claim, confidence: role === "impact" ? 0.88 : role === "trace" ? 0.72 : 0.61,
+                            role, claim: config.claim, confidence: role === "impact" ? 0.88 : role === "trace" ? 0.85 : 0.82,
                             rootCause: config.rootCause,
                         }), participant.getId());
-                        await sleep(38);
+                        await sleep(RESPONDER_TAIL_MS);
                         sendEvent(event(SPAN_COMPLETED, participant.getId(), { role, detail: "independent pass complete" }), participant.getId());
                     })();
                     return;
@@ -289,7 +379,7 @@ function responderHandlers(role, state, dryRun, model, maxOutputTokens, runLoop,
         processor: {
             apply({ participant, event: decisionEvent }) {
                 const payload = decisionEvent.payload;
-                if (payload.decision !== "blocked" || role !== "impact" || state.followupRequested)
+                if (!dryRun || payload.decision !== "blocked" || role !== "impact" || state.followupRequested)
                     return;
                 state.followupRequested = true;
                 void (async () => {
@@ -306,7 +396,7 @@ function responderHandlers(role, state, dryRun, model, maxOutputTokens, runLoop,
         specification: isPeerType(MITIGATION_REPLANNED),
         processor: {
             apply({ participant, event: planEvent }) {
-                if (!dryRun || (role !== "trace" && role !== "dependency"))
+                if (!dryRun || (role !== "trace" && role !== "dependency") || (simulateDependencyTimeout && role === "dependency"))
                     return;
                 void (async () => {
                     await sleep(role === "trace" ? 24 : 42);
@@ -319,34 +409,228 @@ function responderHandlers(role, state, dryRun, model, maxOutputTokens, runLoop,
     };
     return [opened, peerAwareness, modelAnswer, blockedAdaptation, canaryEvidence];
 }
-function gateHandlers(state, sendEvent) {
-    return [{
-            specification: isPeerType(HYPOTHESIS_EMITTED),
-            processor: {
-                apply({ participant, event: hypothesisEvent }) {
-                    const payload = hypothesisEvent.payload;
-                    const role = payload.role;
-                    if (typeof role !== "string" || !ROLES.includes(role))
-                        return;
-                    if (state.hypotheses.some((item) => item.role === role))
-                        return;
-                    const hypothesis = {
-                        role: role,
-                        claim: typeof payload.claim === "string" ? payload.claim : "unspecified claim",
-                        confidence: typeof payload.confidence === "number" ? payload.confidence : 0,
-                        rootCause: typeof payload.rootCause === "string" ? payload.rootCause : "unknown",
-                        atMs: Math.round(performance.now() - state.startedAt),
-                    };
-                    state.hypotheses.push(hypothesis);
-                    state.confidence = state.hypotheses.reduce((sum, item) => sum + item.confidence, 0) / state.hypotheses.length;
-                    state.contradictions = new Set(state.hypotheses.map((item) => item.rootCause)).size - 1;
-                    if (state.hypotheses.length < ROLES.length || state.gateDecision !== "pending")
-                        return;
-                    state.gateDecision = state.confidence >= 0.8 && state.contradictions === 0 ? "approved" : "blocked";
-                    sendEvent(event(GATE_DECISION, participant.getId(), {
-                        decision: state.gateDecision, confidence: state.confidence, contradictions: state.contradictions,
-                        detail: `${state.gateDecision}: ${state.contradictions} conflicting causes; confidence ${state.confidence.toFixed(2)}`,
+function mitigationPrompt(state) {
+    const evidence = state.hypotheses
+        .map((item) => `- ${item.role}: confidence=${item.confidence.toFixed(2)} rootCause=${item.rootCause} claim=${item.claim}`)
+        .join("\n");
+    return [
+        "You are the mitigation owner in IncidentMesh. Phase 1 is complete.",
+        `Incident: ${state.incident}.`,
+        `Safety Gate: ${state.gateDecision}; aggregate confidence=${state.confidence.toFixed(2)}; contradictions=${state.contradictions}.`,
+        "Shared evidence from independent responders:",
+        evidence,
+        "Choose the next mitigation using this shared evidence. If you choose a production rollback, call rollback_production; the Safety Gate will inspect that tool transition. If corroboration is required, account for the tool result and then give a concise final recommendation. Do not claim that Phase-1 responder models saw one another's evidence.",
+    ].join("\n");
+}
+function actionHandlers(state, dryRun, actionProposalMs, actionBoundaryMs, model, maxOutputTokens, runLoop, sendEvent) {
+    const deterministicBoundary = {
+        specification: isType(INCIDENT_OPENED),
+        processor: {
+            apply({ participant }) {
+                if (!dryRun || state.actionProposed)
+                    return;
+                if (!(participant instanceof Agent))
+                    return;
+                void (async () => {
+                    await sleep(actionProposalMs);
+                    state.actionProposed = true;
+                    state.requestedActionTool = "rollback_production";
+                    sendEvent(event(ACTION_PROPOSED, participant.getId(), {
+                        action: "rollback_production",
+                        service: "checkout-api",
+                        boundaryMs: actionBoundaryMs,
+                        detail: `rollback_production is pending; fixed action boundary is ${actionBoundaryMs}ms`,
                     }), participant.getId());
+                    await sleep(actionBoundaryMs - actionProposalMs);
+                    if (state.actionAttemptStarted)
+                        return;
+                    state.actionAttemptStarted = true;
+                    state.actionAttemptedAtMs = Math.round(performance.now() - state.startedAt);
+                    state.hypothesesAtActionBoundary = state.hypotheses.length;
+                    state.contradictionsAtActionBoundary = state.contradictions;
+                    sendEvent(event(ACTION_EXECUTION_REQUESTED, participant.getId(), {
+                        action: "rollback_production",
+                        hypotheses: state.hypotheses.length,
+                        contradictions: state.contradictions,
+                        detail: `action boundary reached with hypotheses=${state.hypotheses.length}, contradictions=${state.contradictions}`,
+                    }), participant.getId());
+                    state.gateAtActionBoundary = state.gateDecision;
+                    runLoop(participant.getId(), "Execute the pending rollback proposal at the fixed action boundary.", {
+                        model: "incidentmesh-deterministic-action",
+                        tools: participant.getTools(),
+                        context: participant.getMemory().getContext(),
+                    }, new SafetyGateInterception(state));
+                })();
+            },
+        },
+    };
+    const providerMitigationPhase = {
+        specification: isPeerType(GATE_DECISION),
+        processor: {
+            apply({ participant }) {
+                if (dryRun || state.mitigationPhaseStarted || !(participant instanceof Agent))
+                    return;
+                state.mitigationPhaseStarted = true;
+                state.actionBoundaryMs = null;
+                sendEvent(event(MITIGATION_PHASE_STARTED, participant.getId(), {
+                    gateDecision: state.gateDecision,
+                    hypotheses: state.hypotheses.length,
+                    detail: `Phase 2 mitigation loop started with ${state.hypotheses.length} shared hypotheses and gate=${state.gateDecision}`,
+                }), participant.getId());
+                runLoop(participant.getId(), mitigationPrompt(state), {
+                    model,
+                    maxOutputTokens,
+                    tools: participant.getTools(),
+                    context: participant.getMemory().getContext(),
+                }, new SafetyGateInterception(state));
+            },
+        },
+    };
+    const providerRecommendation = {
+        specification: new (class extends SituationSpecification {
+            isSatisfiedBy({ event, participant }) {
+                return event.type === "model.answer" && event.producerId === participant.getId();
+            }
+        })(),
+        processor: {
+            apply({ participant, event: answerEvent }) {
+                if (dryRun || !state.mitigationPhaseStarted || state.modelMitigationRecommendation !== null)
+                    return;
+                const recommendation = modelAnswerText(answerEvent.payload);
+                state.modelMitigationRecommendation = recommendation;
+                state.adaptations.push(`Action Controller model recommendation: ${recommendation}`);
+                sendEvent(event(MITIGATION_REPLANNED, participant.getId(), {
+                    role: "action-controller",
+                    source: "model.answer",
+                    detail: recommendation,
+                }), participant.getId());
+            },
+        },
+    };
+    return [deterministicBoundary, providerMitigationPhase, providerRecommendation];
+}
+function gateDecisionForCurrentEvidence(state) {
+    if (state.degradedRoles.length > 0)
+        return "blocked";
+    return state.hypotheses.length > 0 && state.confidence >= 0.8 && state.contradictions === 0 ? "approved" : "blocked";
+}
+function emitGateDecision(state, participantId, sendEvent, reason) {
+    const nextDecision = gateDecisionForCurrentEvidence(state);
+    const changed = state.gateDecision !== nextDecision;
+    state.gateDecision = nextDecision;
+    if (!changed && reason === "late-evidence")
+        return;
+    sendEvent(event(GATE_DECISION, participantId, {
+        decision: state.gateDecision,
+        confidence: state.confidence,
+        contradictions: state.contradictions,
+        hypotheses: state.hypotheses.length,
+        reason,
+        detail: `${state.gateDecision}: ${state.contradictions} contradictions across ${state.hypotheses.length} root-cause hypotheses; confidence ${state.confidence.toFixed(2)} (${reason})`,
+    }), participantId);
+}
+function gateHandlers(state, dryRun, sendEvent) {
+    const collectHypothesis = {
+        specification: isPeerType(HYPOTHESIS_EMITTED),
+        processor: {
+            apply({ participant, event: hypothesisEvent }) {
+                const payload = hypothesisEvent.payload;
+                const role = payload.role;
+                if (typeof role !== "string" || !ROLES.includes(role))
+                    return;
+                if (state.hypotheses.some((item) => item.role === role))
+                    return;
+                const hypothesis = {
+                    role: role,
+                    claim: typeof payload.claim === "string" ? payload.claim : "unspecified claim",
+                    confidence: typeof payload.confidence === "number" ? payload.confidence : 0,
+                    rootCause: typeof payload.rootCause === "string" ? payload.rootCause : "unknown",
+                    atMs: Math.round(performance.now() - state.startedAt),
+                };
+                state.hypotheses.push(hypothesis);
+                state.confidence = state.hypotheses.reduce((sum, item) => sum + item.confidence, 0) / state.hypotheses.length;
+                state.contradictions = new Set(state.hypotheses.map((item) => item.rootCause)).size - 1;
+                if (!dryRun && state.hypotheses.length === ROLES.length && state.gateDecision === "pending") {
+                    emitGateDecision(state, participant.getId(), sendEvent, "evidence-aggregation");
+                    return;
+                }
+                if (state.actionAttemptStarted)
+                    emitGateDecision(state, participant.getId(), sendEvent, "late-evidence");
+            },
+        },
+    };
+    const recordDegradation = {
+        specification: isPeerType(RESPONDER_DEGRADED),
+        processor: {
+            apply({ event: degradedEvent }) {
+                const payload = degradedEvent.payload;
+                const role = payload.role;
+                if (typeof role === "string" && ROLES.includes(role) && !state.degradedRoles.includes(role)) {
+                    state.degradedRoles.push(role);
+                }
+            },
+        },
+    };
+    const decideAtActionBoundary = {
+        specification: isPeerType(ACTION_EXECUTION_REQUESTED),
+        processor: {
+            apply({ participant }) {
+                emitGateDecision(state, participant.getId(), sendEvent, "action-boundary");
+            },
+        },
+    };
+    return [collectHypothesis, recordDegradation, decideAtActionBoundary];
+}
+function frameworkObserverHandlers(state) {
+    const frameworkTypes = new Set(["interception.started", "interception.finished", "function_call.started", "function_call.completed"]);
+    return [{
+            specification: new (class extends SituationSpecification {
+                isSatisfiedBy({ event }) {
+                    return frameworkTypes.has(event.type);
+                }
+            })(),
+            processor: {
+                apply({ event: frameworkEvent }) {
+                    const payload = frameworkEvent.payload;
+                    if (frameworkEvent.type === "interception.started") {
+                        const input = payload.input;
+                        const callName = input?.call?.name;
+                        if (callName === "rollback_production") {
+                            state.actionProposed = true;
+                            state.requestedActionTool = "rollback_production";
+                            if (!state.actionAttemptStarted) {
+                                state.actionAttemptStarted = true;
+                                state.actionAttemptedAtMs = Math.round(performance.now() - state.startedAt);
+                                state.gateAtActionBoundary = state.gateDecision;
+                                state.hypothesesAtActionBoundary = state.hypotheses.length;
+                                state.contradictionsAtActionBoundary = state.contradictions;
+                            }
+                        }
+                        state.record("mozaik.interception.started", frameworkEvent.producerId, `InterceptionHandler received ${callName ?? "function call"}`);
+                        return;
+                    }
+                    if (frameworkEvent.type === "interception.finished") {
+                        const input = payload.input;
+                        state.record("mozaik.interception.finished", frameworkEvent.producerId, `InterceptionHandler returned ${input?.call?.name ?? "rewritten call"}`);
+                        return;
+                    }
+                    if (frameworkEvent.type === "function_call.started") {
+                        const call = payload.call;
+                        if (call?.name === "rollback_production") {
+                            state.actionProposed = true;
+                            state.requestedActionTool = "rollback_production";
+                            if (!state.actionAttemptStarted) {
+                                state.actionAttemptStarted = true;
+                                state.actionAttemptedAtMs = Math.round(performance.now() - state.startedAt);
+                                state.gateAtActionBoundary = state.gateDecision;
+                                state.hypothesesAtActionBoundary = state.hypotheses.length;
+                                state.contradictionsAtActionBoundary = state.contradictions;
+                            }
+                        }
+                        state.record("mozaik.function-call.started", frameworkEvent.producerId, `Mozaik executing ${call?.name ?? "tool"}`);
+                        return;
+                    }
+                    state.record("mozaik.function-call.completed", frameworkEvent.producerId, "Mozaik function tool completed");
                 },
             },
         }];
@@ -385,21 +669,62 @@ export async function runIncidentScenario(options = {}) {
     const dryRun = options.dryRun ?? true;
     const model = options.model ?? "gpt-5.5";
     const maxOutputTokens = options.maxOutputTokens ?? 350;
+    const scheduleMode = options.scheduleMode ?? "concurrent";
+    const actionProposalMs = options.actionProposalMs ?? 45;
+    const actionBoundaryMs = options.actionBoundaryMs ?? 205;
+    const simulateDependencyTimeout = options.simulateDependencyTimeout ?? false;
+    if (actionProposalMs < 0 || actionBoundaryMs <= actionProposalMs) {
+        throw new Error("actionBoundaryMs must be greater than actionProposalMs >= 0");
+    }
     const { initializeRuntime, join, sendEvent, runLoop } = defineRuntime();
     const state = new IncidentState();
+    state.scheduleMode = scheduleMode;
+    state.actionBoundaryMs = actionBoundaryMs;
     state.onTrace = options.trace;
-    initializeRuntime({ state });
-    const observer = createHuman({ name: "Incident Console", capabilities: ["timeline"], handlers: observerHandlers(state) });
-    const gate = createHuman({ name: "Safety Gate", capabilities: ["risk-control", "interception"], handlers: gateHandlers(state, sendEvent) });
+    const inferenceRunner = options.inferenceRunner ?? (dryRun ? new DeterministicActionInferenceRunner() : undefined);
+    initializeRuntime(inferenceRunner
+        ? { state, inferenceRunnerConfig: { runner: inferenceRunner } }
+        : { state });
+    const observer = createHuman({
+        name: "Incident Console",
+        capabilities: ["timeline"],
+        handlers: [...observerHandlers(state), ...frameworkObserverHandlers(state)],
+    });
+    const gate = createHuman({ name: "Safety Gate", capabilities: ["risk-control", "interception"], handlers: gateHandlers(state, dryRun, sendEvent) });
     const responders = ROLES.map((role) => createAgent({
         name: ROLE_CONFIG[role].name,
         capabilities: [ROLE_CONFIG[role].capability, "concurrent-response"],
         instruction: `You are the ${role} responder. Work independently, publish evidence, and react to peer events.`,
         tools: responderTools,
-        handlers: responderHandlers(role, state, dryRun, model, maxOutputTokens, runLoop, sendEvent),
+        handlers: responderHandlers(role, state, dryRun, scheduleMode, simulateDependencyTimeout, model, maxOutputTokens, runLoop, sendEvent),
     }));
+    let actionController;
+    const actionTools = [
+        createRollbackTool(() => {
+            state.actionExecutedTool = "rollback_production";
+            sendEvent(event("incident.action.rollback-tool-executed", actionController.getId(), {
+                action: "rollback_production",
+                detail: "rollback_production tool crossed the action boundary without interception (proposal-only fixture)",
+            }), actionController.getId());
+        }),
+        createRequestCorroborationTool((args) => {
+            state.actionExecutedTool = "request_corroboration";
+            sendEvent(event(SAFE_ACTION_EXECUTED, actionController.getId(), {
+                action: "request_corroboration",
+                originalAction: args.originalAction,
+                detail: `safe tool executed for blocked ${args.originalAction}`,
+            }), actionController.getId());
+        }),
+    ];
+    actionController = createAgent({
+        name: "Action Controller",
+        capabilities: ["production-change", "action-boundary"],
+        instruction: "Execute proposed incident mitigations only through the Safety Gate.",
+        tools: actionTools,
+        handlers: actionHandlers(state, dryRun, actionProposalMs, actionBoundaryMs, model, maxOutputTokens, runLoop, sendEvent),
+    });
     const human = createHuman({ name: "Incident Commander", capabilities: ["incident-input"], handlers: [] });
-    for (const participant of [observer, gate, ...responders, human])
+    for (const participant of [observer, gate, ...responders, actionController, human])
         join(participant);
     sendEvent(event(INCIDENT_OPENED, human.getId(), {
         incident: state.incident,
@@ -410,9 +735,14 @@ export async function runIncidentScenario(options = {}) {
         const respondersComplete = ROLES.every((role) => state.spans.get(role)?.completedAtMs !== undefined);
         if (!respondersComplete || state.gateDecision === "pending")
             return false;
-        if (state.gateDecision === "blocked" && state.adaptations.length === 0)
+        if (dryRun && state.gateDecision === "blocked" && state.adaptations.length === 0)
             return false;
-        if (dryRun && state.gateDecision === "blocked" && state.evidence.length < 2)
+        const expectedFollowupEvidence = simulateDependencyTimeout ? 1 : 2;
+        if (dryRun && state.gateDecision === "blocked" && state.evidence.length < expectedFollowupEvidence)
+            return false;
+        if (dryRun && (!state.actionProposed || state.actionExecutedTool === null))
+            return false;
+        if (!dryRun && (!state.mitigationPhaseStarted || state.modelMitigationRecommendation === null))
             return false;
         return true;
     }, timeoutMs);

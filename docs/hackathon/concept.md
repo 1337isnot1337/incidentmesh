@@ -1,6 +1,6 @@
 # Concept lock: IncidentMesh
 
-IncidentMesh is a concurrent incident-response room. Independent responders inspect different signals at the same time, publish hypotheses and confidence into shared runtime state, and react when another participant changes the situation.
+IncidentMesh is a concurrent incident-response room where three independent investigators can disagree, and that disagreement changes what the system is allowed to do. Responders inspect different signals at the same time, publish hypotheses and confidence into shared runtime state, and react when another participant changes the situation.
 
 Concurrency is necessary because request-path telemetry, dependency health, and customer impact are independent streams that arrive on different clocks. A sequential pipeline forces incident response to wait for unrelated work. A shared room lets evidence become visible while other responders are still investigating.
 

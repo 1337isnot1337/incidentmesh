@@ -21,8 +21,9 @@ for (const span of report.spans) {
   const width = Math.max(1, Math.round((end - span.startedAtMs) / 8))
   console.log(`${span.role.padEnd(11, " ")} ${"█".repeat(width)} ${span.startedAtMs}–${end}ms`)
 }
-console.log(`latency proxy: ${concurrencySpeedup(report)}× summed responder work / concurrent wall time`)
-console.log(`gate: ${report.gateDecision.toUpperCase()} — ${report.contradictions} conflicting causes at ${report.confidence.toFixed(2)} confidence`)
+console.log(`latency/overlap proxy: ${concurrencySpeedup(report)}× = sum of measured responder durations / concurrent wall time`)
+console.log(`gate: ${report.gateDecision.toUpperCase()} — ${report.contradictions} contradictions across ${report.hypotheses.length} distinct root-cause hypotheses at ${report.confidence.toFixed(2)} aggregate confidence`)
+console.log(`action path: rollback_production -> ${report.action.executedTool ?? "not executed"} (${report.action.intercepted ? "Mozaik InterceptionHandler" : "not intercepted"})`)
 console.log(`adaptation: ${report.adaptations[0] ?? "none"}`)
 console.log(`evidence added after adaptation: ${report.evidence.length}`)
 console.log("\nFinal recommendation: proceed with the corroborated canary plan; keep rollback blocked.")

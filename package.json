@@ -31,7 +31,12 @@
     "test": "node --import tsx --test src/*.test.ts",
     "check": "npm run typecheck && npm test",
     "verify:built": "node dist/verify.js",
-    "verify": "npm run check && npm run build && npm run verify:built"
+    "verify": "npm run check && npm run build && npm run verify:built",
+    "ablation": "tsx src/ablation.ts",
+    "replay:visual": "tsx src/replay-visual.ts",
+    "degradation": "tsx src/degradation.ts",
+    "provider:evidence:check": "node scripts/capture-provider-evidence.mjs --check",
+    "provider:evidence:capture": "node scripts/capture-provider-evidence.mjs --execute"
   },
   "dependencies": {
     "@mozaik-ai/core": "4.0.5"

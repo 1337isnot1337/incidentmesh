@@ -1,5 +1,5 @@
 import { RuntimeState } from "@mozaik-ai/core";
-import type { ExecutableTransition, InterceptionHandler, Tool } from "@mozaik-ai/core";
+import type { ExecutableTransition, InferenceRunner, InterceptionHandler, Tool } from "@mozaik-ai/core";
 export declare const INCIDENT_OPENED = "incident.opened";
 export declare const SPAN_STARTED = "incident.span.started";
 export declare const HYPOTHESIS_EMITTED = "incident.hypothesis.emitted";
@@ -7,8 +7,14 @@ export declare const SPAN_COMPLETED = "incident.span.completed";
 export declare const GATE_DECISION = "incident.gate.decision";
 export declare const MITIGATION_REPLANNED = "incident.mitigation.replanned";
 export declare const EVIDENCE_ADDED = "incident.evidence.added";
+export declare const ACTION_PROPOSED = "incident.action.proposed";
+export declare const ACTION_EXECUTION_REQUESTED = "incident.action.execution-requested";
+export declare const SAFE_ACTION_EXECUTED = "incident.action.safe-executed";
+export declare const RESPONDER_DEGRADED = "incident.responder.degraded";
+export declare const MITIGATION_PHASE_STARTED = "incident.mitigation.phase-started";
 export declare const ROLES: readonly ["trace", "dependency", "impact"];
 export type Role = (typeof ROLES)[number];
+export type ScheduleMode = "concurrent" | "sequential";
 export type Hypothesis = {
     role: Role;
     claim: string;
@@ -30,6 +36,7 @@ export type Span = {
 export type IncidentReport = {
     schema: "incidentmesh.report/v1";
     incident: string;
+    scheduleMode: ScheduleMode;
     phase: "contained" | "investigating";
     gateDecision: "blocked" | "approved" | "pending";
     confidence: number;
@@ -37,6 +44,20 @@ export type IncidentReport = {
     hypotheses: Hypothesis[];
     evidence: string[];
     adaptations: string[];
+    degradedRoles: Role[];
+    action: {
+        proposed: boolean;
+        requestedTool: "rollback_production" | null;
+        boundaryMs: number | null;
+        attemptedAtMs: number | null;
+        gateAtBoundary: "blocked" | "approved" | "pending" | null;
+        hypothesesAtBoundary: number;
+        contradictionsAtBoundary: number;
+        intercepted: boolean;
+        executedTool: "rollback_production" | "request_corroboration" | null;
+        mitigationPhaseStarted: boolean;
+        modelRecommendation: string | null;
+    };
     spans: Span[];
     timeline: TimelineEvent[];
     elapsedMs: number;
@@ -47,12 +68,26 @@ export declare class IncidentState extends RuntimeState {
     readonly hypotheses: Hypothesis[];
     readonly evidence: string[];
     readonly adaptations: string[];
+    readonly degradedRoles: Role[];
     readonly spans: Map<"trace" | "dependency" | "impact", Span>;
     readonly timeline: TimelineEvent[];
+    scheduleMode: ScheduleMode;
     gateDecision: IncidentReport["gateDecision"];
     confidence: number;
     contradictions: number;
     followupRequested: boolean;
+    actionProposed: boolean;
+    actionAttemptStarted: boolean;
+    actionBoundaryMs: number | null;
+    requestedActionTool: "rollback_production" | null;
+    actionAttemptedAtMs: number | null;
+    gateAtActionBoundary: IncidentReport["gateDecision"] | null;
+    hypothesesAtActionBoundary: number;
+    contradictionsAtActionBoundary: number;
+    actionIntercepted: boolean;
+    actionExecutedTool: "rollback_production" | "request_corroboration" | null;
+    mitigationPhaseStarted: boolean;
+    modelMitigationRecommendation: string | null;
     onTrace?: (event: TimelineEvent) => void;
     private readonly changeListeners;
     private notifyChange;
@@ -60,6 +95,11 @@ export declare class IncidentState extends RuntimeState {
     record(type: string, producer: string, detail: string): void;
     toReport(): IncidentReport;
 }
+type CorroborationArgs = {
+    originalAction: string;
+    reason: string;
+};
+export declare function createRequestCorroborationTool(onInvoke?: (args: CorroborationArgs) => void): Tool;
 export declare const requestCorroborationTool: Tool;
 export declare class SafetyGateInterception implements InterceptionHandler {
     private readonly state;
@@ -74,6 +114,11 @@ export type ScenarioOptions = {
     model?: string;
     maxOutputTokens?: number;
     timeoutMs?: number;
+    scheduleMode?: ScheduleMode;
+    actionProposalMs?: number;
+    actionBoundaryMs?: number;
+    simulateDependencyTimeout?: boolean;
+    inferenceRunner?: InferenceRunner;
     trace?: (event: TimelineEvent) => void;
 };
 export declare function runIncidentScenario(options?: ScenarioOptions): Promise<IncidentReport>;
