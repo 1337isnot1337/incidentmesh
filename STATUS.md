@@ -13,12 +13,12 @@ JIGJOY_STATUS=SUBMISSION_READY
 - Tests: clean `npm ci`, `npm run verify`; strict typecheck, 3 passing tests, production build, and built smoke verification.
 - Benchmark: representative dry-run concurrent wall time ~220 ms vs summed sequential baseline ~505 ms; 2.3× speedup proxy; same three hypotheses; 3/3 overlap pairs.
 - Demo: `npm run demo`; narration in `DEMO.md`.
-- Repo status: complete neutral local Git repo at this directory; no public remote.
-- Submission status: not submitted. Public publication is blocked because the only authenticated GitHub account is treated as operator-associated and no privacy-safe competition account/repository is authorized.
+- Repo status: complete local Git repo at this directory; publication to the operator-authorized GitHub account is approved for this run.
+- Submission status: not submitted; public repository publication is the next step, followed by the official submission form.
 - Deadline: Monday, September 7, 2026 at 09:00 CET / 03:00 ET; resubmission is allowed and latest entry is judged.
 - Cash prize target: top three; $500 / $300 / $200.
 
-Highest remaining weakness: no public repository URL or video/live deployment is attached, so judges cannot yet open the entry through the official submission form.
+Highest remaining weakness: no public repository URL or video/live deployment is attached yet, so judges cannot yet open the entry through the official submission form.
 
 Next three improvements before the deadline:
 
