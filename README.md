@@ -140,4 +140,4 @@ The software remains **UNLICENSED**; no open-source license has been selected.
 
 ## Hackathon
 
-Built for the JigJoy × daily.dev × Hyperskill concurrent-agents hackathon. [Rules, submission copy, and audit history](docs/hackathon/) are preserved separately. Official competition submission remains an operator action.
+Built for the JigJoy × daily.dev × Hyperskill concurrent-agents hackathon. [Rules, submission copy, and audit history](docs/hackathon/) are preserved separately. The project is submitted and publicly visible in the [JigJoy gallery](https://build.jigjoy.ai/gallery/incidentmesh-40ad9c); later resubmissions may update the judged entry before the deadline.
