@@ -40,7 +40,7 @@ export type ActionBoundarySnapshot = Readonly<{
     contradictions: number;
     proposedAction: "rollback_production";
 }>;
-export type HypothesisAcceptanceStatus = "accepted" | "late-accepted" | "duplicate" | "spoofed-role" | "unknown-role" | "malformed";
+export type HypothesisAcceptanceStatus = "accepted" | "late-accepted" | "duplicate" | "spoofed-role" | "unknown-role" | "malformed" | "closed-role";
 export type Hypothesis = {
     role: Role;
     claim: string;
@@ -111,6 +111,8 @@ export declare class IncidentState extends RuntimeState {
     followupRequested: boolean;
     holdPlanRecorded: boolean;
     private readonly responderIds;
+    private safetyGateId;
+    private actionControllerId;
     actionProposed: boolean;
     actionAttemptStarted: boolean;
     actionBoundaryMs: number | null;
@@ -132,6 +134,11 @@ export declare class IncidentState extends RuntimeState {
     private readonly changeListeners;
     private notifyChange;
     registerResponder(role: Role, participantId: string): void;
+    isResponderProducer(role: Role, participantId: string): boolean;
+    registerSafetyGate(participantId: string): void;
+    isSafetyGateProducer(participantId: string): boolean;
+    registerActionController(participantId: string): void;
+    isActionControllerProducer(participantId: string): boolean;
     markDegraded(role: Role): boolean;
     private recalculateAggregate;
     acceptHypothesis(producerId: string, payload: EventPayload): {

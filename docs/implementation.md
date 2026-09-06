@@ -132,6 +132,6 @@ npm run build
 npm run verify:built
 ```
 
-Nineteen focused invariant tests cover concurrent overlap, snapshot-authoritative rollback, complete approval, complete conflict blocking, incomplete boundary blocking, per-responder confidence, causal scheduling differences, immutable boundary snapshots, closed degraded responders, generic hanging and explicit timeout degradation, producer-role binding, duplicate policy, investigation-only Phase 1, canonical Mozaik interception, provider preflight, phase-1 settling, the approved proposal-only path, and two-phase scripted model interception.
+Twenty focused invariant tests cover concurrent overlap, snapshot-authoritative rollback, a 500-seed adversarial ordering sweep, complete approval, complete conflict blocking, incomplete boundary blocking, per-responder confidence, causal scheduling differences, immutable boundary snapshots, closed degraded responders, generic hanging and explicit timeout degradation, producer-role binding, duplicate policy, investigation-only Phase 1, canonical Mozaik interception, provider preflight, phase-1 settling, the approved proposal-only path, and two-phase scripted model interception.
 
 `dist/` is intentionally committed. Judges can inspect or run the built JavaScript without trusting an unpublished package, while `src/` remains the source of truth.

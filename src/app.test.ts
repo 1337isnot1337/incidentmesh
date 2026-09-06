@@ -240,6 +240,67 @@ test("degraded responders are closed for the current action phase", () => {
   assert.equal(evaluateSafetyGate(state.hypotheses, state.degradedRoles).decision, "blocked")
 })
 
+function seededRandom(seed: number): () => number {
+  let state = seed >>> 0
+  return () => {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0
+    return state / 0x1_0000_0000
+  }
+}
+
+test("seeded adversarial ordering preserves snapshot authorization and closed-role invariants", async () => {
+  for (let seed = 1; seed <= 500; seed += 1) {
+    const random = seededRandom(seed)
+    const state = new IncidentState()
+    for (const role of ROLES) state.registerResponder(role, `${role}-id`)
+
+    const closedRole = random() < 0.45 ? ROLES[Math.floor(random() * ROLES.length)] : null
+    if (closedRole !== null) state.markDegraded(closedRole)
+
+    const roles = [...ROLES]
+    for (let i = roles.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(random() * (i + 1))
+      ;[roles[i], roles[j]] = [roles[j], roles[i]]
+    }
+
+    const sameCause = random() < 0.5
+    const confidences = new Map<Role, number>(ROLES.map((role) => [role, random() < 0.75 ? 0.8 + random() * 0.2 : random() * 0.79]))
+    const captureAfter = Math.floor(random() * (ROLES.length + 1))
+    let attemptedClosedRole = false
+
+    for (let index = 0; index < roles.length; index += 1) {
+      if (index === captureAfter) state.captureActionBoundarySnapshot("rollback_production")
+      const role = roles[index]
+      const result = state.acceptHypothesis(`${role}-id`, {
+        role,
+        claim: `${role} seed ${seed}`,
+        confidence: confidences.get(role),
+        rootCause: sameCause ? "same-cause" : `cause-${role}`,
+      })
+      if (role === closedRole) {
+        attemptedClosedRole = true
+        assert.equal(result.status, "closed-role", `seed=${seed}`)
+      }
+    }
+    if (captureAfter === ROLES.length) state.captureActionBoundarySnapshot("rollback_production")
+
+    // Deliberately corrupt the mutable investigation gate; authorization must still
+    // be determined exclusively by the frozen action-boundary snapshot.
+    state.gateDecision = "approved"
+    state.gateReason = "sufficient-consistent-evidence"
+    const transition = rollbackTransition(`seed-${seed}`)
+    const result = await new SafetyGateInterception(state).handle(transition)
+    const executed = (result as typeof transition).input.call.name
+    const snapshot = state.actionBoundarySnapshot
+    assert.ok(snapshot, `seed=${seed}`)
+    assert.equal(executed === "rollback_production", snapshot.decision === "approved", `seed=${seed}`)
+    if (closedRole !== null) {
+      assert.equal(attemptedClosedRole, true, `seed=${seed}`)
+      assert.equal(snapshot.availableRoles.includes(closedRole), false, `seed=${seed}`)
+    }
+  }
+})
+
 test("producer identity, unknown roles, and duplicate policy cannot alter safety aggregates", () => {
   const state = new IncidentState()
   state.registerResponder("trace", "trace-id")
@@ -424,7 +485,7 @@ test("two-phase scripted model integration traverses the real post-aggregation i
   assert.match(mitigationPrompt, /Safety Gate: blocked \(conflicting-evidence\)/)
 })
 
-test("approved evidence allows the proposal-only rollback path without interception", async () => {
+test("approved evidence allows the proposal-only rollback path without rewrite", async () => {
   const report = await runIncidentScenario({
     dryRun: false,
     inferenceRunner: new ScriptedTwoPhaseInferenceRunner(false, true),

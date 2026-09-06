@@ -154,6 +154,7 @@ export class IncidentState extends RuntimeState {
   holdPlanRecorded = false
   private readonly responderIds = new Map<Role, string>()
   private safetyGateId: string | null = null
+  private actionControllerId: string | null = null
   actionProposed = false
   actionAttemptStarted = false
   actionBoundaryMs: number | null = 205
@@ -192,6 +193,14 @@ export class IncidentState extends RuntimeState {
 
   isSafetyGateProducer(participantId: string): boolean {
     return this.safetyGateId === participantId
+  }
+
+  registerActionController(participantId: string): void {
+    this.actionControllerId = participantId
+  }
+
+  isActionControllerProducer(participantId: string): boolean {
+    return this.actionControllerId === participantId
   }
 
   markDegraded(role: Role): boolean {
@@ -974,7 +983,10 @@ function gateHandlers(state: IncidentState, sendEvent: (event: SemanticEvent, se
   const decideAtActionBoundary: SituationHandler = {
     specification: isPeerType(ACTION_EXECUTION_REQUESTED),
     processor: {
-      apply({ participant }) {
+      apply({ participant, event: executionEvent }) {
+        if (!state.isActionControllerProducer(executionEvent.producerId)) return
+        const payload = executionEvent.payload as EventPayload
+        if (payload.action !== "rollback_production") return
         emitActionBoundaryDecision(state, participant.getId(), sendEvent)
       },
     },
@@ -1131,7 +1143,7 @@ export async function runIncidentScenario(options: ScenarioOptions = {}): Promis
       state.actionExecutedTool = "rollback_production"
       sendEvent(event("incident.action.rollback-tool-executed", actionController.getId(), {
         action: "rollback_production",
-        detail: "rollback_production tool crossed the action boundary without interception (proposal-only fixture)",
+        detail: "rollback_production tool crossed the action boundary without safety rewrite (proposal-only fixture)",
       }), actionController.getId())
     }),
     createRequestCorroborationTool((args) => {
@@ -1150,6 +1162,7 @@ export async function runIncidentScenario(options: ScenarioOptions = {}): Promis
     tools: actionTools,
     handlers: actionHandlers(state, dryRun, phase1Only, actionProposalMs, actionBoundaryMs, model, maxOutputTokens, runLoop, sendEvent),
   })
+  state.registerActionController(actionController.getId())
   const human = createHuman({ name: "Incident Commander", capabilities: ["incident-input"], handlers: [] })
   for (const participant of [observer, gate, ...responders, actionController, human]) join(participant)
 
