@@ -37,7 +37,7 @@
 <text x="220" y="648" fill="#8ee3c7" font-size="23" font-weight="400">Safe tool executed</text>
 <text x="40" y="696" fill="#b0c1cc" font-size="21" font-family="ui-monospace, SFMono-Regular, Consolas, monospace">240 ms</text>
 <circle cx="195" cy="689" r="4" fill="#8ee3c7"/>
-<text x="220" y="696" fill="#8ee3c7" font-size="23" font-weight="400">Impact → canary</text>
+<text x="220" y="696" fill="#8ee3c7" font-size="23" font-weight="400">Impact selects canary</text>
 <text x="40" y="744" fill="#b0c1cc" font-size="21" font-family="ui-monospace, SFMono-Regular, Consolas, monospace">264 ms</text>
 <circle cx="195" cy="737" r="4" fill="#8ee3c7"/>
 <text x="220" y="744" fill="#8ee3c7" font-size="23" font-weight="400">Trace corroborates</text>
