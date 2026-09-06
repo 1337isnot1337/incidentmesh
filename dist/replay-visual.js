@@ -124,7 +124,7 @@ const keyEvents = [
     { key: "interception", label: "Mozaik interception", event: first("mozaik.interception.started") },
     { key: "rewrite", label: "Rewritten to request_corroboration", event: first("mozaik.interception.rewritten") },
     { key: "safe", label: "Safe tool executed", event: first("incident.action.safe-executed") },
-    { key: "canary", label: "Impact → canary", event: first("incident.mitigation.replanned") },
+    { key: "canary", label: "Impact selects canary", event: first("incident.mitigation.replanned") },
     ...all("incident.evidence.added").map((event, index) => ({ key: `evidence-${index}`, label: `${event.producer} corroborates`, event })),
 ].filter((item) => item.event !== undefined);
 const canonicalBoundaryMs = report.action.boundaryMs;

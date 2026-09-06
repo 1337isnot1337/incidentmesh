@@ -8,7 +8,7 @@
     <text x="24" y="155" fill="#b0c1cc" font-size="21">Safety Gate · conflicting evidence</text>
     <path d="M24 184 H416" stroke="#30404b"/>
     <g font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="24">
-      <text x="24" y="224" fill="#b0c1cc">− rollback_production</text>
+      <text x="24" y="224" fill="#b0c1cc">- rollback_production</text>
       <text x="24" y="263" fill="#8ee3c7">+ request_corroboration</text>
     </g>
     <text x="24" y="298" fill="#b0c1cc" font-size="17">Deterministic demo</text>
