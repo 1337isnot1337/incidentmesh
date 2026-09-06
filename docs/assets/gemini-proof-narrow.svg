@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="440" height="560" viewBox="0 0 440 560" role="img" aria-labelledby="title desc">
+  <title id="title">Authenticated Gemini provider run</title>
+  <desc id="desc">Compact historical Gemini Flash-Lite receipt. Trace, Dependency, and Impact provider calls overlap for 1,389 milliseconds. The same run records rollback_production being intercepted and rewritten to request_corroboration before provider follow-up.</desc>
+  <rect width="440" height="560" rx="16" fill="#101820"/>
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+    <text x="24" y="42" fill="#f0f5f7" font-size="22" font-weight="700">One authenticated Gemini run</text>
+    <text x="24" y="68" fill="#b0c1cc" font-size="14">gemini-3.5-flash-lite · historical receipt</text>
+
+    <g font-size="16" fill="#b0c1cc">
+      <text x="24" y="114">Trace</text>
+      <text x="24" y="166">Dependency</text>
+      <text x="24" y="218">Impact</text>
+    </g>
+    <g stroke="#30404b" stroke-width="10" stroke-linecap="round">
+      <path d="M122 108 H302"/><path d="M122 160 H302"/><path d="M122 212 H302"/>
+    </g>
+    <g stroke="#72d5c2" stroke-width="10" stroke-linecap="round">
+      <path d="M122 108 H279"/><path d="M122 160 H301"/><path d="M122 212 H288"/>
+    </g>
+    <g font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="14" fill="#f0f5f7">
+      <text x="416" y="113" text-anchor="end">2-1392 ms</text>
+      <text x="416" y="165" text-anchor="end">3-1584 ms</text>
+      <text x="416" y="217" text-anchor="end">3-1468 ms</text>
+    </g>
+
+    <rect x="24" y="250" width="392" height="84" rx="12" fill="#13242c" stroke="#30404b"/>
+    <text x="42" y="292" fill="#72d5c2" font-size="34" font-weight="760">1,389 ms</text>
+    <text x="42" y="318" fill="#b0c1cc" font-size="14">common three-way provider-call overlap</text>
+
+    <text x="24" y="373" fill="#b0c1cc" font-size="13" font-weight="700" letter-spacing="1">PHASE 2 IN THE SAME RUN</text>
+    <g font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="16">
+      <rect x="24" y="392" width="392" height="38" rx="8" fill="#17232b"/>
+      <text x="42" y="417" fill="#f0f5f7">rollback_production</text>
+      <rect x="24" y="438" width="392" height="38" rx="8" fill="#2b211d"/>
+      <text x="42" y="463" fill="#ffb18a">SafetyGateInterception</text>
+      <rect x="24" y="484" width="392" height="38" rx="8" fill="#162923"/>
+      <text x="42" y="509" fill="#8ee3c7">request_corroboration</text>
+    </g>
+    <g fill="none" stroke="#708794" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M390 429 V437 M386 433 L390 437 L394 433"/>
+      <path d="M390 475 V483 M386 479 L390 483 L394 479"/>
+    </g>
+    <text x="24" y="544" fill="#708794" font-size="12">receipt 65d98f8 · no production mutation · historical provider evidence</text>
+  </g>
+</svg>
