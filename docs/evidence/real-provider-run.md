@@ -1,62 +1,43 @@
-# IncidentMesh authenticated Gemini Phase-1 receipt
+# IncidentMesh real-provider run evidence
 
-This file summarizes one bounded provider-backed Phase-1 execution. It is evidence of authenticated responder concurrency, not a production-readiness claim and not a claim of provider-backed Phase-2 tool execution.
+This file records one provider-backed execution. It is execution evidence, not a production-readiness claim.
 
-- Capture started: 2026-09-06T05:22:18.110Z
-- Capture process ended: 2026-09-06T05:22:48.358Z
-- Captured commit: `d2f50acb08c476e56f8975ebda11219b8fe3ce47`
+- Started: 2026-09-06T14:04:38.014Z
+- Completed: 2026-09-06T14:04:41.443Z
+- Commit: 65d98f8feda666932fcbace88037c7009b487a35
 - Node: v24.19.0
 - Mozaik: 4.0.5
-- Provider: Google
-- Model: `gemini-3.5-flash`
-- Command: `RUN_MODEL=1 DRY_RUN=0 PHASE1_ONLY=1 MODEL=gemini-3.5-flash node dist/index.js`
+- Provider: google
+- Model: gemini-3.5-flash-lite
+- Command: `RUN_MODEL=1 DRY_RUN=0 PHASE1_ONLY=0 MODEL=gemini-3.5-flash-lite GEMINI_SIGNATURE_COMPAT=1 node dist/index.js`
 - Provider credential required: yes
-- Phase-1 responder inference completed: yes
-- Structured hypotheses received by shared state: 3
-- Aggregate gate after Phase 1: `BLOCKED — conflicting-evidence`
-- Phase-2 action execution in this receipt: not attempted
-- Interception in this receipt: not attempted
+- Run completed: yes
+- Gate decision: blocked
+- Interception observed: yes
+- Requested action: rollback_production
+- Executed tool: request_corroboration
+- Model recommendation recorded: yes
 
-## Provider inference windows
+## Participants
 
-This receipt was captured before the phase-1-only settlement wakeup fix. The three provider spans and inference events are complete by 2881 ms; the report's longer wall-clock duration reflects the old bookkeeping timeout, not a provider call that remained active.
+- trace: 2ms -> 1392ms
+- dependency: 3ms -> 1584ms
+- impact: 3ms -> 1468ms
 
-| Responder | Inference started | Inference completed | Duration |
-| --- | ---: | ---: | ---: |
-| Trace | 4 ms | 2,418 ms | 2,414 ms |
-| Dependency | 5 ms | 2,881 ms | 2,876 ms |
-| Impact | 5 ms | 2,602 ms | 2,597 ms |
+## Concurrency
 
-All three authenticated provider calls were simultaneously in flight.
+Overlapping participant pairs: 3.
 
-`max(start) = 5 ms`
+Peer-awareness observations recorded by runtime participants: 6; 3 occurred while the observer's own inference span was still active.
 
-`min(completion) = 2,418 ms`
+## Runtime facts
 
-Therefore the measured three-way provider-inference overlap is **2,413 ms**.
+- Hypotheses received by shared state: 3
+- Adaptations recorded: 1
+- Evidence notes recorded: 0
 
-The wider responder spans also overlap pairwise in all three combinations:
+## Limitations
 
-- Trace ↔ Dependency: 2,416 ms
-- Trace ↔ Impact: 2,416 ms
-- Dependency ↔ Impact: 2,599 ms
-
-## Structured hypotheses
-
-The three real model calls returned distinct structured hypotheses that entered shared `IncidentState`:
-
-- Trace — `downstream_dependency_exhaustion`, confidence 0.85
-- Impact — `dependency_latency_spike`, confidence 0.85
-- Dependency — `broken_dependency_upgrade`, confidence 0.80
-
-After the third hypothesis arrived, the aggregate Safety Gate recorded `BLOCKED — conflicting-evidence` with two contradictions across three hypotheses.
-
-## Scope and limitations
-
-- This capture intentionally stops at the Phase-1 evidence layer. It does not claim a verified provider-backed Phase-2 function-call/interception execution.
-- The deterministic IncidentMesh demo and tests separately prove the action-boundary and real Mozaik interception behavior; the causal ablation separately controls the scheduling comparison.
-- The raw report contains an `incident.scenario.timeout` at approximately 30 seconds from the then-current Phase-1-only settling waiter. All three provider inferences had already completed by 2,881 ms, and the timeout is not used to derive the overlap measurement above.
-- The report exposes normalized IncidentMesh/Mozaik events, not raw provider request/response bodies or authorization metadata.
-- A single successful authenticated execution does not establish production reliability, reasoning quality, throughput, or MTTR improvement.
-
-[Inspect the raw evidence JSON](real-provider-run.json)
+- The report exposes IncidentMesh incident events, not raw provider request/response bodies or authorization metadata.
+- Raw provider request/response bodies are not preserved; IncidentMesh records normalized hypotheses, Mozaik interception/function-call events, and the Phase-2 model recommendation.
+- A single successful execution does not establish production reliability or MTTR improvement.

@@ -172,6 +172,7 @@ export type ScenarioOptions = {
     phase1Only?: boolean;
     model?: string;
     maxOutputTokens?: number;
+    reasoningEffort?: string;
     timeoutMs?: number;
     scheduleMode?: ScheduleMode;
     actionProposalMs?: number;
@@ -179,6 +180,7 @@ export type ScenarioOptions = {
     simulateDependencyTimeout?: boolean;
     evidenceDeadlineMs?: number;
     inferenceRunner?: InferenceRunner;
+    evidenceOverride?: Partial<Record<Role, Pick<Hypothesis, "claim" | "confidence" | "rootCause">>>;
     trace?: (event: TimelineEvent) => void;
 };
 export declare function runIncidentScenario(options?: ScenarioOptions): Promise<IncidentReport>;

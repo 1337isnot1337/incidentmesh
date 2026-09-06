@@ -1,0 +1,43 @@
+{
+  "schema": "incidentmesh.semantic-stability/v1",
+  "repetitionsPerArm": 25,
+  "runs": 50,
+  "semanticMismatches": [],
+  "concurrent": {
+    "expected": {
+      "gateAtBoundary": "blocked",
+      "gateReasonAtBoundary": "conflicting-evidence",
+      "hypothesesAtBoundary": 3,
+      "contradictionsAtBoundary": 2,
+      "boundarySafeAction": "canary-with-targeted-corroboration",
+      "intercepted": true,
+      "executedTool": "request_corroboration",
+      "finalGate": "blocked",
+      "finalReason": "conflicting-evidence",
+      "timedOut": false
+    },
+    "elapsedMs": {
+      "min": 282,
+      "max": 286
+    }
+  },
+  "sequential": {
+    "expected": {
+      "gateAtBoundary": "blocked",
+      "gateReasonAtBoundary": "incomplete-required-evidence",
+      "hypothesesAtBoundary": 1,
+      "contradictionsAtBoundary": 0,
+      "boundarySafeAction": "hold-for-missing-evidence",
+      "intercepted": true,
+      "executedTool": "request_corroboration",
+      "finalGate": "blocked",
+      "finalReason": "conflicting-evidence",
+      "timedOut": false
+    },
+    "elapsedMs": {
+      "min": 542,
+      "max": 545
+    }
+  },
+  "finding": "Observed timer jitter may shift elapsed milliseconds, but the canonical concurrent and sequential semantic projections remained stable across every repeated run."
+}

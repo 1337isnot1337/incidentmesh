@@ -1,10 +1,13 @@
 import process from "node:process";
 import { runIncidentScenario } from "./app.js";
 import { providerPreflight } from "./provider-safety.js";
+import { GeminiSignaturePreservingRunner } from "./gemini-compat.js";
 const env = process.env;
 const dryRun = env.DRY_RUN !== "0" && env.RUN_MODEL !== "1";
 const model = env.MODEL ?? "gpt-5.5";
 const phase1Only = env.PHASE1_ONLY === "1";
+const reasoningEffort = env.MODEL_REASONING_EFFORT;
+const geminiCompatibility = env.GEMINI_SIGNATURE_COMPAT === "1" && /^gemini-/i.test(model);
 const preflight = dryRun ? null : providerPreflight(model, env);
 function safeProviderError(reason) {
     const raw = reason instanceof Error ? `${reason.name}: ${reason.message}\n${reason.stack ?? ""}` : String(reason);
@@ -40,6 +43,12 @@ else {
             process.exit(1);
         });
     }
-    const report = await runIncidentScenario({ dryRun, model, phase1Only });
+    const report = await runIncidentScenario({
+        dryRun,
+        model,
+        phase1Only,
+        reasoningEffort,
+        inferenceRunner: geminiCompatibility ? new GeminiSignaturePreservingRunner() : undefined,
+    });
     console.log(JSON.stringify(report));
 }

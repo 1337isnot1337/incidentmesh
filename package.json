@@ -33,8 +33,11 @@
     "verify:built": "node dist/verify.js",
     "verify": "npm run check && npm run build && npm run verify:built",
     "ablation": "tsx src/ablation.ts",
+    "ablation:provider-derived": "tsx src/provider-derived-ablation.ts",
     "replay:visual": "tsx src/replay-visual.ts",
     "degradation": "tsx src/degradation.ts",
+    "stress:safety": "tsx src/stress-safety.ts",
+    "stability:semantic": "tsx src/semantic-stability.ts",
     "provider:evidence:check": "node scripts/capture-provider-evidence.mjs --check",
     "provider:evidence:capture": "node scripts/capture-provider-evidence.mjs --execute"
   },

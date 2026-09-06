@@ -37,6 +37,35 @@ function assertFiniteTime(value, label, displayPath) {
 function assertEvidenceShape(file, displayPath, text) {
   if (!file.endsWith(".json")) return
   const value = JSON.parse(text)
+  if (value?.schema === "incidentmesh.safety-stress/v1") {
+    for (const key of ["seed", "cases", "approvedSnapshots", "blockedSnapshots", "approvedCrossings", "blockedRewrites", "unauthorizedRollbackCrossings", "snapshotMutationViolations", "invariantViolations"]) {
+      if (!(key in value)) throw new Error(`${displayPath}: missing required safety-stress field ${key}`)
+    }
+    if (!Array.isArray(value.invariantViolations)) throw new Error(`${displayPath}: invariantViolations must be an array`)
+    if (value.unauthorizedRollbackCrossings !== 0 || value.snapshotMutationViolations !== 0 || value.invariantViolations.length !== 0) {
+      throw new Error(`${displayPath}: safety-stress evidence contains invariant violations`)
+    }
+    return
+  }
+  if (value?.schema === "incidentmesh.provider-derived-ablation/v1") {
+    for (const key of ["source", "fixedInputs", "changedVariable", "concurrent", "sequential", "hypothesesStableAcrossArms", "unauthorizedRollbackCrossing"]) {
+      if (!(key in value)) throw new Error(`${displayPath}: missing required provider-derived field ${key}`)
+    }
+    if (value.hypothesesStableAcrossArms !== true || value.unauthorizedRollbackCrossing !== false) {
+      throw new Error(`${displayPath}: provider-derived causal invariants failed`)
+    }
+    return
+  }
+  if (value?.schema === "incidentmesh.semantic-stability/v1") {
+    for (const key of ["repetitionsPerArm", "runs", "semanticMismatches", "concurrent", "sequential"]) {
+      if (!(key in value)) throw new Error(`${displayPath}: missing required semantic-stability field ${key}`)
+    }
+    if (!Array.isArray(value.semanticMismatches) || value.semanticMismatches.length !== 0) {
+      throw new Error(`${displayPath}: semantic-stability evidence contains mismatches`)
+    }
+    return
+  }
+  if (value?.schema === "incidentmesh.report/v1") return
   if (value?.schema !== "incidentmesh.provider-evidence/v1") {
     throw new Error(`${displayPath}: unexpected or missing evidence schema`)
   }
@@ -86,6 +115,33 @@ function assertEvidenceShape(file, displayPath, text) {
   if (commonEndMs <= commonStartMs) {
     throw new Error(`${displayPath}: responder inference windows do not have positive three-way overlap`)
   }
+
+  if (value.events.some((item) => item?.type === "incident.scenario.timeout")) {
+    throw new Error(`${displayPath}: provider evidence contains an internal scenario timeout`)
+  }
+  if (value.phase1Only === false) {
+    const recommendation = value.action?.modelRecommendation
+    const requiredEvents = [
+      "incident.mitigation.phase-started",
+      "mozaik.interception.started",
+      "mozaik.interception.rewritten",
+      "incident.action.safe-executed",
+      "incident.mitigation.replanned",
+    ]
+    if (value.gateDecision !== "blocked"
+      || value.interceptionObserved !== true
+      || value.action?.requestedTool !== "rollback_production"
+      || value.action?.executedTool !== "request_corroboration"
+      || typeof recommendation !== "string"
+      || recommendation.trim().length === 0) {
+      throw new Error(`${displayPath}: incomplete authenticated Phase-2 proof`)
+    }
+    for (const type of requiredEvents) {
+      if (!value.events.some((item) => item?.type === type)) {
+        throw new Error(`${displayPath}: missing required Phase-2 event ${type}`)
+      }
+    }
+  }
 }
 
 const files = process.argv.slice(2)
@@ -113,7 +169,7 @@ for (const input of files) {
     console.error(`${displayPath}: rejected: ${matches.map(({ name }) => name).join(", ")}`)
     failures += 1
   } else {
-    const proof = file.endsWith(".json") ? "structure, three-role inference proof, and " : ""
+    const proof = file.endsWith(".json") ? "structure, invariant proof, and " : ""
     console.log(`${displayPath}: evidence ${proof}secret-pattern scan passed`)
   }
 }

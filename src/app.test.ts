@@ -12,8 +12,10 @@ import {
   type Hypothesis,
   type Role,
 } from "./app.js"
-import { FunctionCallItem, ModelMessageItem, SemanticEvent } from "@mozaik-ai/core"
+import { FunctionCallItem, FunctionCallOutputItem, GeminiGenerateContent, ModelContext, ModelMessageItem, SemanticEvent, UserMessageItem } from "@mozaik-ai/core"
 import type { ExecutableTransition, InferenceInput, InferenceOutput, InferenceRunner } from "@mozaik-ai/core"
+import { runSafetyStress } from "./safety-stress.js"
+import { GeminiSignaturePreservingRunner } from "./gemini-compat.js"
 
 function hypothesis(role: Role, confidence = 0.9, rootCause = "same-cause"): Hypothesis {
   return { role, claim: `${role} claim`, confidence, rootCause, atMs: 0 }
@@ -150,6 +152,27 @@ test("gate policy distinguishes investigation waiting from fail-closed action de
   assert.ok(Math.abs(evaluateSafetyGate(weakOutlier).confidence - 0.8) < 1e-12)
   assert.equal(evaluateSafetyGate(weakOutlier).decision, "blocked")
   assert.equal(evaluateSafetyGate(weakOutlier).reason, "low-confidence-evidence")
+})
+
+test("every non-empty missing-role combination fails closed with an explicit hold", () => {
+  for (let mask = 1; mask < (1 << ROLES.length); mask += 1) {
+    const missing = ROLES.filter((_, index) => (mask & (1 << index)) !== 0)
+    const state = new IncidentState()
+    for (const role of ROLES) state.registerResponder(role, `${role}-id`)
+    for (const role of ROLES) {
+      if (missing.includes(role)) continue
+      assert.equal(state.acceptHypothesis(`${role}-id`, {
+        role, claim: `${role} claim`, confidence: 0.9, rootCause: "same-cause",
+      }).status, "accepted")
+    }
+
+    const snapshot = state.captureActionBoundarySnapshot("rollback_production")
+    assert.equal(snapshot.decision, "blocked")
+    assert.equal(snapshot.reason, "incomplete-required-evidence")
+    assert.deepEqual(snapshot.missingRequiredRoles, missing)
+    assert.equal(snapshot.availableRoles.length + snapshot.missingRequiredRoles.length, ROLES.length)
+    assert.equal(state.boundarySafeAction, "hold-for-missing-evidence")
+  }
 })
 
 test("rollback interception requires affirmative approval, not mere absence of a block", async () => {
@@ -354,6 +377,114 @@ test("valid structured model evidence preserves provider confidence and root cau
   })
 })
 
+test("Mozaik 4.0.5 Gemini mapper does not preserve thought signatures across tool calls", () => {
+  const endpoint = new GeminiGenerateContent()
+  const context = new ModelContext("thought-signature-regression", [
+    UserMessageItem.rehydrate({ text: "choose a mitigation" }),
+    FunctionCallItem.rehydrate({
+      callId: "rollback-call",
+      name: "rollback_production",
+      args: JSON.stringify({ service: "checkout-api", reason: "test" }),
+    }),
+  ])
+  const request = endpoint.endpointMapper.toRequest({
+    model: "gemini-3.5-flash",
+    context,
+    tools: [],
+  }) as { contents: Array<{ parts: Array<{ functionCall?: Record<string, unknown> }> }> }
+  const functionCall = request.contents.at(-1)?.parts.at(-1)?.functionCall
+  assert.deepEqual(functionCall, {
+    id: "rollback-call",
+    name: "rollback_production",
+    args: { service: "checkout-api", reason: "test" },
+  })
+  assert.equal(functionCall && "thought_signature" in functionCall, false)
+})
+
+test("signature-preserving Gemini runner round-trips thought signatures locally", async () => {
+  const requests: Array<{ contents: Array<{ parts: Array<{ functionCall?: Record<string, unknown>; thoughtSignature?: string }> }> }> = []
+  const client = {
+    models: {
+      async generateContent(request: { contents: unknown[]; model: string; config: Record<string, unknown> }) {
+        requests.push(request as typeof requests[number])
+        return requests.length === 1
+          ? { candidates: [{ content: { parts: [{ functionCall: { id: "call-1", name: "rollback_production", args: {} }, thoughtSignature: "signature-1" }] } }] }
+          : { candidates: [{ content: { parts: [{ text: "safe recommendation" }] } }] }
+      },
+    },
+  }
+  const runner = new GeminiSignaturePreservingRunner(client)
+  const firstContext = new ModelContext("compat-test", [UserMessageItem.create("choose a mitigation")])
+  const first = await runner.run({ model: "gemini-3.5-flash", context: firstContext, tools: [] })
+  assert.equal(first.items[0]?.type, "function_call")
+  const secondContext = new ModelContext("compat-test", [
+    UserMessageItem.create("choose a mitigation"),
+    FunctionCallItem.rehydrate({ callId: "call-1", name: "rollback_production", args: "{}" }),
+    FunctionCallOutputItem.create("call-1", JSON.stringify({ status: "blocked" })),
+  ])
+  const second = await runner.run({ model: "gemini-3.5-flash", context: secondContext, tools: [] })
+  assert.equal(second.items[0]?.type, "message")
+  const functionPart = requests[1]?.contents.flatMap((item) => item.parts).find((part) => part.functionCall)
+  assert.equal(functionPart?.functionCall?.name, "rollback_production")
+  assert.equal(functionPart?.thoughtSignature, "signature-1")
+})
+
+test("Gemini runner omits unsupported none thinking level", async () => {
+  let config: Record<string, unknown> | undefined
+  const client = {
+    models: {
+      async generateContent(request: { contents: unknown[]; model: string; config: Record<string, unknown> }) {
+        config = request.config
+        return { candidates: [{ content: { parts: [{ text: "ok" }] } }] }
+      },
+    },
+  }
+  const runner = new GeminiSignaturePreservingRunner(client)
+  await runner.run({
+    model: "gemini-3.5-flash",
+    context: new ModelContext("thinking-level-test", [UserMessageItem.create("respond")]),
+    tools: [],
+    reasoningEffort: "none",
+  })
+  assert.equal("thinkingConfig" in (config ?? {}), false)
+})
+
+test("signature-preserving runner traverses the complete mocked provider Phase-2 loop", async () => {
+  const client = {
+    models: {
+      async generateContent(request: { contents: unknown[] }) {
+        const text = JSON.stringify(request.contents)
+        if (text.includes("mitigation owner in IncidentMesh")) {
+          const hasToolResult = text.includes("functionResponse")
+          return hasToolResult
+            ? { candidates: [{ content: { parts: [{ text: "keep rollback blocked; proceed with targeted corroboration" }] } }] }
+            : { candidates: [{ content: { parts: [{ functionCall: { id: "phase2-call", name: "rollback_production", args: { service: "checkout-api", reason: "restore service" } }, thoughtSignature: "phase2-signature" }] } }] }
+        }
+        const role = text.includes("trace responder") ? "trace"
+          : text.includes("dependency responder") ? "dependency"
+            : "impact"
+        const fixture = role === "trace"
+          ? { claim: "trace sees cache churn", confidence: 0.85, rootCause: "cache-stampede" }
+          : role === "dependency"
+            ? { claim: "dependency sees deploy-linked pool wait", confidence: 0.82, rootCause: "deploy-8f3" }
+            : { claim: "impact sees regional checkout failures", confidence: 0.88, rootCause: "regional-impact" }
+        return { candidates: [{ content: { parts: [{ text: JSON.stringify(fixture) }] } }] }
+      },
+    },
+  }
+  const report = await runIncidentScenario({
+    dryRun: false,
+    model: "gemini-3.5-flash",
+    inferenceRunner: new GeminiSignaturePreservingRunner(client),
+    timeoutMs: 2_000,
+  })
+  assert.equal(report.action.mitigationPhaseStarted, true)
+  assert.equal(report.action.requestedTool, "rollback_production")
+  assert.equal(report.action.intercepted, true)
+  assert.equal(report.action.executedTool, "request_corroboration")
+  assert.match(report.action.modelRecommendation ?? "", /targeted corroboration/)
+})
+
 test("explicit Dependency timeout degrades the role and terminates through the safe tool", async () => {
   const report = await runIncidentScenario({ dryRun: true, simulateDependencyTimeout: true })
   assert.deepEqual(report.degradedRoles, ["dependency"])
@@ -374,6 +505,7 @@ test("explicit Dependency timeout degrades the role and terminates through the s
 class ScriptedTwoPhaseInferenceRunner implements InferenceRunner {
   readonly mitigationPrompts: string[] = []
   readonly phase1ToolNames: string[][] = []
+  readonly reasoningEfforts: Array<string | undefined> = []
 
   constructor(
     private readonly hangDependency = false,
@@ -381,6 +513,7 @@ class ScriptedTwoPhaseInferenceRunner implements InferenceRunner {
   ) {}
 
   async run(request: InferenceInput): Promise<InferenceOutput> {
+    this.reasoningEfforts.push(request.reasoningEffort)
     const items = request.context.getItems()
     const userMessages = items.flatMap((item) => {
       const candidate = item as unknown as { role?: string; content?: { text?: unknown } }
@@ -455,6 +588,18 @@ test("phase-1-only model runs settle as soon as all provider hypotheses complete
   assert.deepEqual(runner.phase1ToolNames, [[], [], []])
 })
 
+test("opt-in reasoning effort is forwarded to every provider loop", async () => {
+  const runner = new ScriptedTwoPhaseInferenceRunner()
+  await runIncidentScenario({
+    dryRun: false,
+    phase1Only: true,
+    reasoningEffort: "none",
+    inferenceRunner: runner,
+    timeoutMs: 2_000,
+  })
+  assert.deepEqual(runner.reasoningEfforts, ["none", "none", "none"])
+})
+
 test("two-phase scripted model integration traverses the real post-aggregation interceptor", async () => {
   const runner = new ScriptedTwoPhaseInferenceRunner()
   const report = await runIncidentScenario({ dryRun: false, inferenceRunner: runner, timeoutMs: 2_000 })
@@ -501,6 +646,16 @@ test("approved evidence allows the proposal-only rollback path without rewrite",
   assert.equal(report.timeline.some((item) => item.type === "mozaik.interception.rewritten"), false)
   assert.ok(report.timeline.some((item) => item.type === "incident.action.rollback-tool-executed"))
   assert.match(report.action.modelRecommendation ?? "", /5% canary/)
+})
+
+test("seeded safety stress preserves the affirmative-approval crossing invariant", async () => {
+  const result = await runSafetyStress({ cases: 2_000, seed: 0x1cedb00c })
+  assert.equal(result.cases, 2_000)
+  assert.ok(result.approvedCrossings > 0)
+  assert.ok(result.blockedRewrites > 0)
+  assert.equal(result.unauthorizedRollbackCrossings, 0)
+  assert.equal(result.snapshotMutationViolations, 0)
+  assert.deepEqual(result.invariantViolations, [])
 })
 
 test("phase-1-only degraded runs settle when the action-phase evidence window closes", async () => {

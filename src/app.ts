@@ -4,6 +4,7 @@ import {
   ModelMessageItem,
   RuntimeState,
   SemanticEvent,
+  supportedModels,
   SituationSpecification,
   createAgent,
   createHuman,
@@ -598,8 +599,10 @@ function responderHandlers(
   simulateDependencyTimeout: boolean,
   model: string,
   maxOutputTokens: number,
+  reasoningEffort: string | undefined,
   runLoop: ReturnType<typeof defineRuntime<IncidentState>>["runLoop"],
   sendEvent: ReturnType<typeof defineRuntime<IncidentState>>["sendEvent"],
+  evidenceOverride?: Partial<Record<Role, Pick<Hypothesis, "claim" | "confidence" | "rootCause">>>,
 ): SituationHandler[] {
   const config = ROLE_CONFIG[role]
   const opened: SituationHandler = {
@@ -620,9 +623,12 @@ function responderHandlers(
               sendEvent(event(SPAN_COMPLETED, participant.getId(), { role, detail: "investigation ended without evidence: timeout" }), participant.getId())
               return
             }
+            const fixture = evidenceOverride?.[role]
             sendEvent(event(HYPOTHESIS_EMITTED, participant.getId(), {
-              role, claim: config.claim, confidence: role === "impact" ? 0.88 : role === "trace" ? 0.85 : 0.82,
-              rootCause: config.rootCause,
+              role,
+              claim: fixture?.claim ?? config.claim,
+              confidence: fixture?.confidence ?? (role === "impact" ? 0.88 : role === "trace" ? 0.85 : 0.82),
+              rootCause: fixture?.rootCause ?? config.rootCause,
             }), participant.getId())
             await sleep(RESPONDER_TAIL_MS)
             sendEvent(event(SPAN_COMPLETED, participant.getId(), { role, detail: "independent pass complete" }), participant.getId())
@@ -634,6 +640,7 @@ function responderHandlers(
         runLoop(participant.getId(), responderPrompt(role, state), {
           model,
           maxOutputTokens,
+          ...(reasoningEffort === undefined ? {} : { reasoningEffort }),
           tools: [],
           structuredOutput: MODEL_HYPOTHESIS_OUTPUT,
           context: participant.getMemory().getContext(),
@@ -762,6 +769,7 @@ function actionHandlers(
   actionBoundaryMs: number,
   model: string,
   maxOutputTokens: number,
+  reasoningEffort: string | undefined,
   runLoop: ReturnType<typeof defineRuntime<IncidentState>>["runLoop"],
   sendEvent: ReturnType<typeof defineRuntime<IncidentState>>["sendEvent"],
 ): SituationHandler[] {
@@ -825,6 +833,7 @@ function actionHandlers(
         runLoop(participant.getId(), mitigationPrompt(state), {
           model,
           maxOutputTokens,
+          ...(reasoningEffort === undefined ? {} : { reasoningEffort }),
           tools: participant.getTools(),
           context: participant.getMemory().getContext(),
         }, new SafetyGateInterception(state))
@@ -1087,6 +1096,7 @@ export type ScenarioOptions = {
   phase1Only?: boolean
   model?: string
   maxOutputTokens?: number
+  reasoningEffort?: string
   timeoutMs?: number
   scheduleMode?: ScheduleMode
   actionProposalMs?: number
@@ -1094,6 +1104,7 @@ export type ScenarioOptions = {
   simulateDependencyTimeout?: boolean
   evidenceDeadlineMs?: number
   inferenceRunner?: InferenceRunner
+  evidenceOverride?: Partial<Record<Role, Pick<Hypothesis, "claim" | "confidence" | "rootCause">>>
   trace?: (event: TimelineEvent) => void
 }
 
@@ -1102,6 +1113,7 @@ export async function runIncidentScenario(options: ScenarioOptions = {}): Promis
   const phase1Only = options.phase1Only ?? false
   const model = options.model ?? "gpt-5.5"
   const maxOutputTokens = options.maxOutputTokens ?? 350
+  const reasoningEffort = options.reasoningEffort
   const scheduleMode = options.scheduleMode ?? "concurrent"
   const actionProposalMs = options.actionProposalMs ?? 45
   const actionBoundaryMs = options.actionBoundaryMs ?? 205
@@ -1115,9 +1127,17 @@ export async function runIncidentScenario(options: ScenarioOptions = {}): Promis
   state.actionBoundaryMs = actionBoundaryMs
   state.onTrace = options.trace
   const inferenceRunner = options.inferenceRunner ?? (dryRun ? new DeterministicActionInferenceRunner() : undefined)
+  const runtimeModels = model === "gemini-3.5-flash-lite"
+    ? (() => {
+      const base = supportedModels.find((candidate) => candidate.specification.name === "gemini-3.5-flash")
+      return base === undefined
+        ? undefined
+        : [...supportedModels, { ...base, specification: { ...base.specification, name: model } }]
+    })()
+    : undefined
   initializeRuntime(inferenceRunner
-    ? { state, inferenceRunnerConfig: { runner: inferenceRunner } }
-    : { state })
+    ? { state, inferenceRunnerConfig: { runner: inferenceRunner, ...(runtimeModels === undefined ? {} : { supportedModels: runtimeModels }) } }
+    : runtimeModels === undefined ? { state } : { state, inferenceRunnerConfig: { supportedModels: runtimeModels } })
 
   const observer = createHuman({
     name: "Incident Console",
@@ -1132,7 +1152,7 @@ export async function runIncidentScenario(options: ScenarioOptions = {}): Promis
       capabilities: [ROLE_CONFIG[role].capability, "concurrent-response"],
       instruction: `You are the ${role} responder. Work independently, publish evidence, and react to peer events.`,
       tools: [],
-      handlers: responderHandlers(role, state, dryRun, scheduleMode, simulateDependencyTimeout, model, maxOutputTokens, runLoop, sendEvent),
+      handlers: responderHandlers(role, state, dryRun, scheduleMode, simulateDependencyTimeout, model, maxOutputTokens, reasoningEffort, runLoop, sendEvent, options.evidenceOverride),
     })
     state.registerResponder(role, responder.getId())
     return responder
@@ -1160,7 +1180,7 @@ export async function runIncidentScenario(options: ScenarioOptions = {}): Promis
     capabilities: ["production-change", "action-boundary"],
     instruction: "Execute proposed incident mitigations only through the Safety Gate.",
     tools: actionTools,
-    handlers: actionHandlers(state, dryRun, phase1Only, actionProposalMs, actionBoundaryMs, model, maxOutputTokens, runLoop, sendEvent),
+    handlers: actionHandlers(state, dryRun, phase1Only, actionProposalMs, actionBoundaryMs, model, maxOutputTokens, reasoningEffort, runLoop, sendEvent),
   })
   state.registerActionController(actionController.getId())
   const human = createHuman({ name: "Incident Commander", capabilities: ["incident-input"], handlers: [] })

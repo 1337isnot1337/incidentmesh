@@ -1,4 +1,4 @@
-import { Agent, FunctionCallItem, ModelMessageItem, RuntimeState, SemanticEvent, SituationSpecification, createAgent, createHuman, defineRuntime, } from "@mozaik-ai/core";
+import { Agent, FunctionCallItem, ModelMessageItem, RuntimeState, SemanticEvent, supportedModels, SituationSpecification, createAgent, createHuman, defineRuntime, } from "@mozaik-ai/core";
 export const INCIDENT_OPENED = "incident.opened";
 export const SPAN_STARTED = "incident.span.started";
 export const HYPOTHESIS_EMITTED = "incident.hypothesis.emitted";
@@ -439,7 +439,7 @@ class DeterministicActionInferenceRunner {
         yield SemanticEvent.create("inference.output", "deterministic-action-runner", await this.run(request));
     }
 }
-function responderHandlers(role, state, dryRun, scheduleMode, simulateDependencyTimeout, model, maxOutputTokens, runLoop, sendEvent) {
+function responderHandlers(role, state, dryRun, scheduleMode, simulateDependencyTimeout, model, maxOutputTokens, reasoningEffort, runLoop, sendEvent, evidenceOverride) {
     const config = ROLE_CONFIG[role];
     const opened = {
         specification: isType(INCIDENT_OPENED),
@@ -461,9 +461,12 @@ function responderHandlers(role, state, dryRun, scheduleMode, simulateDependency
                             sendEvent(event(SPAN_COMPLETED, participant.getId(), { role, detail: "investigation ended without evidence: timeout" }), participant.getId());
                             return;
                         }
+                        const fixture = evidenceOverride?.[role];
                         sendEvent(event(HYPOTHESIS_EMITTED, participant.getId(), {
-                            role, claim: config.claim, confidence: role === "impact" ? 0.88 : role === "trace" ? 0.85 : 0.82,
-                            rootCause: config.rootCause,
+                            role,
+                            claim: fixture?.claim ?? config.claim,
+                            confidence: fixture?.confidence ?? (role === "impact" ? 0.88 : role === "trace" ? 0.85 : 0.82),
+                            rootCause: fixture?.rootCause ?? config.rootCause,
                         }), participant.getId());
                         await sleep(RESPONDER_TAIL_MS);
                         sendEvent(event(SPAN_COMPLETED, participant.getId(), { role, detail: "independent pass complete" }), participant.getId());
@@ -476,6 +479,7 @@ function responderHandlers(role, state, dryRun, scheduleMode, simulateDependency
                 runLoop(participant.getId(), responderPrompt(role, state), {
                     model,
                     maxOutputTokens,
+                    ...(reasoningEffort === undefined ? {} : { reasoningEffort }),
                     tools: [],
                     structuredOutput: MODEL_HYPOTHESIS_OUTPUT,
                     context: participant.getMemory().getContext(),
@@ -595,7 +599,7 @@ function mitigationPrompt(state) {
         "Choose the next mitigation using this shared evidence. If you choose a production rollback, call rollback_production; the Safety Gate will inspect that tool transition. If corroboration is required, account for the tool result and then give a concise final recommendation. Do not claim that Phase-1 responder models saw one another's evidence.",
     ].join("\n");
 }
-function actionHandlers(state, dryRun, phase1Only, actionProposalMs, actionBoundaryMs, model, maxOutputTokens, runLoop, sendEvent) {
+function actionHandlers(state, dryRun, phase1Only, actionProposalMs, actionBoundaryMs, model, maxOutputTokens, reasoningEffort, runLoop, sendEvent) {
     const deterministicBoundary = {
         specification: isType(INCIDENT_OPENED),
         processor: {
@@ -660,6 +664,7 @@ function actionHandlers(state, dryRun, phase1Only, actionProposalMs, actionBound
                 runLoop(participant.getId(), mitigationPrompt(state), {
                     model,
                     maxOutputTokens,
+                    ...(reasoningEffort === undefined ? {} : { reasoningEffort }),
                     tools: participant.getTools(),
                     context: participant.getMemory().getContext(),
                 }, new SafetyGateInterception(state));
@@ -907,6 +912,7 @@ export async function runIncidentScenario(options = {}) {
     const phase1Only = options.phase1Only ?? false;
     const model = options.model ?? "gpt-5.5";
     const maxOutputTokens = options.maxOutputTokens ?? 350;
+    const reasoningEffort = options.reasoningEffort;
     const scheduleMode = options.scheduleMode ?? "concurrent";
     const actionProposalMs = options.actionProposalMs ?? 45;
     const actionBoundaryMs = options.actionBoundaryMs ?? 205;
@@ -920,9 +926,17 @@ export async function runIncidentScenario(options = {}) {
     state.actionBoundaryMs = actionBoundaryMs;
     state.onTrace = options.trace;
     const inferenceRunner = options.inferenceRunner ?? (dryRun ? new DeterministicActionInferenceRunner() : undefined);
+    const runtimeModels = model === "gemini-3.5-flash-lite"
+        ? (() => {
+            const base = supportedModels.find((candidate) => candidate.specification.name === "gemini-3.5-flash");
+            return base === undefined
+                ? undefined
+                : [...supportedModels, { ...base, specification: { ...base.specification, name: model } }];
+        })()
+        : undefined;
     initializeRuntime(inferenceRunner
-        ? { state, inferenceRunnerConfig: { runner: inferenceRunner } }
-        : { state });
+        ? { state, inferenceRunnerConfig: { runner: inferenceRunner, ...(runtimeModels === undefined ? {} : { supportedModels: runtimeModels }) } }
+        : runtimeModels === undefined ? { state } : { state, inferenceRunnerConfig: { supportedModels: runtimeModels } });
     const observer = createHuman({
         name: "Incident Console",
         capabilities: ["timeline"],
@@ -936,7 +950,7 @@ export async function runIncidentScenario(options = {}) {
             capabilities: [ROLE_CONFIG[role].capability, "concurrent-response"],
             instruction: `You are the ${role} responder. Work independently, publish evidence, and react to peer events.`,
             tools: [],
-            handlers: responderHandlers(role, state, dryRun, scheduleMode, simulateDependencyTimeout, model, maxOutputTokens, runLoop, sendEvent),
+            handlers: responderHandlers(role, state, dryRun, scheduleMode, simulateDependencyTimeout, model, maxOutputTokens, reasoningEffort, runLoop, sendEvent, options.evidenceOverride),
         });
         state.registerResponder(role, responder.getId());
         return responder;
@@ -964,7 +978,7 @@ export async function runIncidentScenario(options = {}) {
         capabilities: ["production-change", "action-boundary"],
         instruction: "Execute proposed incident mitigations only through the Safety Gate.",
         tools: actionTools,
-        handlers: actionHandlers(state, dryRun, phase1Only, actionProposalMs, actionBoundaryMs, model, maxOutputTokens, runLoop, sendEvent),
+        handlers: actionHandlers(state, dryRun, phase1Only, actionProposalMs, actionBoundaryMs, model, maxOutputTokens, reasoningEffort, runLoop, sendEvent),
     });
     state.registerActionController(actionController.getId());
     const human = createHuman({ name: "Incident Commander", capabilities: ["incident-input"], handlers: [] });

@@ -1,0 +1,20 @@
+{
+  "schema": "incidentmesh.safety-stress/v1",
+  "seed": 485339148,
+  "cases": 10000,
+  "approvedSnapshots": 988,
+  "blockedSnapshots": 9012,
+  "approvedCrossings": 988,
+  "blockedRewrites": 9012,
+  "unauthorizedRollbackCrossings": 0,
+  "snapshotMutationViolations": 0,
+  "invariantViolations": [],
+  "generatedProfiles": {
+    "approved": 1621,
+    "missing": 1717,
+    "conflicting": 1670,
+    "low-confidence": 1701,
+    "adversarial": 1677,
+    "late-evidence": 1614
+  }
+}

@@ -17,6 +17,9 @@ const PROVIDER_CREDENTIALS: Record<string, string[]> = {
 
 export function providerPreflight(model: string, env: Record<string, string | undefined>): ProviderPreflight {
   const specification = supportedModels.find((candidate) => candidate.specification.name === model)?.specification
+    ?? (model === "gemini-3.5-flash-lite"
+      ? supportedModels.find((candidate) => candidate.specification.name === "gemini-3.5-flash")?.specification
+      : undefined)
   if (!specification) {
     return { ok: false, model, provider: null, acceptedCredentialNames: [], error: "unsupported_model" }
   }
