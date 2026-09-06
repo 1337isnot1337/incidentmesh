@@ -38,21 +38,25 @@ Confirm all action language says proposal-only and no text claims production mut
 
 ## Video and images
 
-- Record from [`../demo.md`](../demo.md), roughly 80 seconds.
-- Upload screenshots `01 → 02 → 03 → 04`.
-- Preserve any existing demo/deployment URL.
-- Verify the first image is the intended cover and every link is public.
+- Final video: `https://www.youtube.com/watch?v=ohw8Ybt_dIM`.
+- Verify the YouTube page is public or unlisted, embeddable, and offers the processed 1080p stream.
+- Upload screenshots `01 -> 02 -> 03 -> 04` from `docs/gallery/`.
+- Verify the first image is the intended cover and every image opens logged out.
+- Use [`../demo.md`](../demo.md) as the final watch/run/verify guide; it is no longer a recording script.
 
 ## JigJoy resubmission
 
-Paste only the Project name, Repository URL, Description, and Concurrency sections from [`submission.md`](submission.md). Discover the resulting slug from the public gallery index rather than assuming the prior slug.
+Paste the Project name, Repository URL, Description, Concurrency explanation, and Demo/video URL from [`submission.md`](submission.md). Upload the four screenshots listed there in the documented order.
+
+The rules allow resubmission until the deadline and state that the latest entry is the one judged. Treat the resubmission itself as a release gate: the existing public entry is not final until its demo URL and final simplified copy are visible on the logged-out detail page.
 
 Logged out, verify:
 
 1. gallery card appears with the correct cover and summary;
-2. detail API returns HTTP 200 for the discovered slug;
+2. detail API returns HTTP 200 for the currently listed IncidentMesh slug;
 3. detail page renders rather than only returning the web shell;
-4. repository, video, and screenshots open;
-5. description and concurrency explanation match the final copy.
+4. repository, video, and all four screenshots open;
+5. description and concurrency explanation match the final copy;
+6. the demo field contains `https://www.youtube.com/watch?v=ohw8Ybt_dIM`.
 
-If the index lists IncidentMesh but its detail API remains 404, preserve both responses and escalate using [`submission-surface-audit.md`](submission-surface-audit.md). Freeze after the public checks pass.
+If the gallery index and detail page disagree after resubmission, preserve both responses and use [`submission-surface-audit.md`](submission-surface-audit.md) to record the discrepancy before contacting organizers. Freeze the repository after the public checks pass.
