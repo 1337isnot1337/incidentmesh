@@ -141,6 +141,15 @@ test("gate policy distinguishes investigation waiting from fail-closed action de
   const weak = ROLES.map((role) => hypothesis(role, 0.7, "same-cause"))
   assert.equal(evaluateSafetyGate(weak).decision, "blocked")
   assert.equal(evaluateSafetyGate(weak).reason, "low-confidence-evidence")
+
+  const weakOutlier = [
+    hypothesis("trace", 1, "same-cause"),
+    hypothesis("dependency", 1, "same-cause"),
+    hypothesis("impact", 0.4, "same-cause"),
+  ]
+  assert.ok(Math.abs(evaluateSafetyGate(weakOutlier).confidence - 0.8) < 1e-12)
+  assert.equal(evaluateSafetyGate(weakOutlier).decision, "blocked")
+  assert.equal(evaluateSafetyGate(weakOutlier).reason, "low-confidence-evidence")
 })
 
 test("rollback interception requires affirmative approval, not mere absence of a block", async () => {
@@ -159,7 +168,26 @@ test("rollback interception requires affirmative approval, not mere absence of a
   const approvedState = new IncidentState()
   approvedState.gateDecision = "approved"
   approvedState.gateReason = "sufficient-consistent-evidence"
-  assert.equal(new SafetyGateInterception(approvedState).isSatisfiedBy(rollbackTransition("approved-rollback")), false)
+  const approvedGate = new SafetyGateInterception(approvedState)
+  const approvedWithoutEvidence = rollbackTransition("approved-live-gate-only")
+  assert.equal(approvedGate.isSatisfiedBy(approvedWithoutEvidence), true)
+  const rewrittenApprovedWithoutSnapshot = await approvedGate.handle(approvedWithoutEvidence)
+  assert.equal((rewrittenApprovedWithoutSnapshot as typeof approvedWithoutEvidence).input.call.name, "request_corroboration")
+  assert.equal(approvedState.actionBoundarySnapshot?.decision, "blocked")
+
+  const snapshotApprovedState = new IncidentState()
+  for (const role of ROLES) {
+    snapshotApprovedState.registerResponder(role, `${role}-id`)
+    assert.equal(snapshotApprovedState.acceptHypothesis(`${role}-id`, {
+      role, claim: `${role} claim`, confidence: 0.9, rootCause: "same-cause",
+    }).status, "accepted")
+  }
+  const approvedTransition = rollbackTransition("approved-snapshot")
+  const snapshotApprovedGate = new SafetyGateInterception(snapshotApprovedState)
+  assert.equal(snapshotApprovedGate.isSatisfiedBy(approvedTransition), true)
+  const passedApproved = await snapshotApprovedGate.handle(approvedTransition)
+  assert.equal((passedApproved as typeof approvedTransition).input.call.name, "rollback_production")
+  assert.equal(snapshotApprovedState.actionBoundarySnapshot?.decision, "approved")
 
   const safeCall = FunctionCallItem.rehydrate({ callId: "safe", name: "request_corroboration", args: "{}" })
   const safeTransition = { nextStateId: "function_call" as const, input: { call: safeCall, inferenceInput: {} as never } }
@@ -199,6 +227,17 @@ test("action-boundary snapshot is immutable while late evidence updates investig
   assert.deepEqual(snapshot.availableRoles, ["trace"])
   assert.deepEqual(snapshot.missingRequiredRoles, ["dependency", "impact"])
   assert.equal(evaluateSafetyGate(state.hypotheses).reason, "conflicting-evidence")
+})
+
+test("degraded responders are closed for the current action phase", () => {
+  const state = new IncidentState()
+  state.registerResponder("dependency", "dependency-id")
+  state.markDegraded("dependency")
+  assert.equal(state.acceptHypothesis("dependency-id", {
+    role: "dependency", claim: "late dependency claim", confidence: 1, rootCause: "same-cause",
+  }).status, "closed-role")
+  assert.equal(state.hypotheses.length, 0)
+  assert.equal(evaluateSafetyGate(state.hypotheses, state.degradedRoles).decision, "blocked")
 })
 
 test("producer identity, unknown roles, and duplicate policy cannot alter safety aggregates", () => {
@@ -273,6 +312,7 @@ test("explicit Dependency timeout degrades the role and terminates through the s
 
 class ScriptedTwoPhaseInferenceRunner implements InferenceRunner {
   readonly mitigationPrompts: string[] = []
+  readonly phase1ToolNames: string[][] = []
 
   constructor(
     private readonly hangDependency = false,
@@ -313,6 +353,7 @@ class ScriptedTwoPhaseInferenceRunner implements InferenceRunner {
         : prompt.includes("impact responder") ? "impact"
           : null
     assert.ok(role, `unexpected scripted inference prompt: ${prompt}`)
+    this.phase1ToolNames.push((request.tools ?? []).map((tool) => tool.name))
 
     if (role === "dependency" && this.hangDependency) {
       return await new Promise<InferenceOutput>(() => {})
@@ -336,10 +377,11 @@ class ScriptedTwoPhaseInferenceRunner implements InferenceRunner {
 }
 
 test("phase-1-only model runs settle as soon as all provider hypotheses complete", async () => {
+  const runner = new ScriptedTwoPhaseInferenceRunner()
   const report = await runIncidentScenario({
     dryRun: false,
     phase1Only: true,
-    inferenceRunner: new ScriptedTwoPhaseInferenceRunner(),
+    inferenceRunner: runner,
     timeoutMs: 2_000,
   })
 
@@ -348,6 +390,8 @@ test("phase-1-only model runs settle as soon as all provider hypotheses complete
   assert.equal(report.gateReason, "conflicting-evidence")
   assert.equal(report.timeline.some((item) => item.type === "incident.scenario.timeout"), false)
   assert.ok(report.elapsedMs < 2_000)
+  assert.equal(runner.phase1ToolNames.length, 3)
+  assert.deepEqual(runner.phase1ToolNames, [[], [], []])
 })
 
 test("two-phase scripted model integration traverses the real post-aggregation interceptor", async () => {
@@ -396,6 +440,25 @@ test("approved evidence allows the proposal-only rollback path without intercept
   assert.equal(report.timeline.some((item) => item.type === "mozaik.interception.rewritten"), false)
   assert.ok(report.timeline.some((item) => item.type === "incident.action.rollback-tool-executed"))
   assert.match(report.action.modelRecommendation ?? "", /5% canary/)
+})
+
+test("phase-1-only degraded runs settle when the action-phase evidence window closes", async () => {
+  const runner = new ScriptedTwoPhaseInferenceRunner(true)
+  const report = await runIncidentScenario({
+    dryRun: false,
+    phase1Only: true,
+    inferenceRunner: runner,
+    timeoutMs: 1_000,
+    evidenceDeadlineMs: 100,
+  })
+
+  assert.deepEqual(report.degradedRoles, ["dependency"])
+  assert.deepEqual(report.hypotheses.map((item) => item.role).sort(), ["impact", "trace"])
+  assert.equal(report.gateDecision, "blocked")
+  assert.equal(report.gateReason, "incomplete-required-evidence")
+  assert.equal(report.action.mitigationPhaseStarted, false)
+  assert.equal(report.timeline.some((item) => item.type === "incident.scenario.timeout"), false)
+  assert.ok(report.elapsedMs < 1_000)
 })
 
 test("a generally hanging required model responder degrades at the evidence deadline", async () => {

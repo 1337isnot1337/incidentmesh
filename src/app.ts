@@ -70,7 +70,14 @@ export type ActionBoundarySnapshot = Readonly<{
   contradictions: number
   proposedAction: "rollback_production"
 }>
-export type HypothesisAcceptanceStatus = "accepted" | "late-accepted" | "duplicate" | "spoofed-role" | "unknown-role" | "malformed"
+export type HypothesisAcceptanceStatus =
+  | "accepted"
+  | "late-accepted"
+  | "duplicate"
+  | "spoofed-role"
+  | "unknown-role"
+  | "malformed"
+  | "closed-role"
 
 export type Hypothesis = {
   role: Role
@@ -146,6 +153,7 @@ export class IncidentState extends RuntimeState {
   followupRequested = false
   holdPlanRecorded = false
   private readonly responderIds = new Map<Role, string>()
+  private safetyGateId: string | null = null
   actionProposed = false
   actionAttemptStarted = false
   actionBoundaryMs: number | null = 205
@@ -174,6 +182,18 @@ export class IncidentState extends RuntimeState {
     this.responderIds.set(role, participantId)
   }
 
+  isResponderProducer(role: Role, participantId: string): boolean {
+    return this.responderIds.get(role) === participantId
+  }
+
+  registerSafetyGate(participantId: string): void {
+    this.safetyGateId = participantId
+  }
+
+  isSafetyGateProducer(participantId: string): boolean {
+    return this.safetyGateId === participantId
+  }
+
   markDegraded(role: Role): boolean {
     if (this.degradedRoles.includes(role)) return false
     this.degradedRoles.push(role)
@@ -195,8 +215,11 @@ export class IncidentState extends RuntimeState {
     const rawRole = payload.role
     if (typeof rawRole !== "string" || !ROLES.includes(rawRole as Role)) return { status: "unknown-role" }
     const role = rawRole as Role
-    if (this.responderIds.get(role) !== producerId) return { status: "spoofed-role", role }
+    if (!this.isResponderProducer(role, producerId)) return { status: "spoofed-role", role }
     if (this.hypotheses.some((item) => item.role === role)) return { status: "duplicate", role }
+    // Once a required responder is degraded/closed for this action phase, a delayed
+    // completion may be observed but cannot improve the authoritative gate state.
+    if (this.degradedRoles.includes(role)) return { status: "closed-role", role }
 
     const confidence = payload.confidence
     const claim = payload.claim
@@ -410,8 +433,6 @@ function createRollbackTool(onInvoke?: (args: RollbackArgs) => void): Tool {
   }
 }
 
-const rollbackTool: Tool = createRollbackTool()
-
 type CorroborationArgs = { originalAction: string; reason: string }
 
 export function createRequestCorroborationTool(onInvoke?: (args: CorroborationArgs) => void): Tool {
@@ -439,15 +460,13 @@ export function createRequestCorroborationTool(onInvoke?: (args: CorroborationAr
 
 export const requestCorroborationTool: Tool = createRequestCorroborationTool()
 
-const responderTools: Tool[] = [rollbackTool, requestCorroborationTool]
-
 export class SafetyGateInterception implements InterceptionHandler {
   constructor(private readonly state: IncidentState) {}
 
   isSatisfiedBy(transition: ExecutableTransition): boolean {
-    const effectiveDecision = this.state.actionBoundarySnapshot?.decision ?? this.state.gateDecision
-    return effectiveDecision !== "approved"
-      && transition.nextStateId === "function_call"
+    // Every rollback proposal must cross this handler. Authorization is derived
+    // only from the immutable action-boundary snapshot, never the mutable live gate.
+    return transition.nextStateId === "function_call"
       && transition.input.call.name === "rollback_production"
   }
 
@@ -457,9 +476,11 @@ export class SafetyGateInterception implements InterceptionHandler {
     }
     const functionCallTransition = transition as Extract<ExecutableTransition, { nextStateId: "function_call" }>
     const call = functionCallTransition.input.call
+    const snapshot = this.state.captureActionBoundarySnapshot("rollback_production")
+    if (snapshot.decision === "approved") return transition
+
     this.state.actionIntercepted = true
-    const reason = this.state.actionBoundarySnapshot?.reason
-      ?? (this.state.gateDecision === "pending" ? "incomplete-required-evidence" : this.state.gateReason)
+    const reason = snapshot.reason
     this.state.record("mozaik.interception.rewritten", "Safety Gate", `rewrote ${call.name} -> request_corroboration (${reason})`)
     const safeCall = FunctionCallItem.rehydrate({
       callId: call.callId,
@@ -479,7 +500,7 @@ function responderPrompt(role: Role, state: IncidentState): string {
     `You are ${ROLE_CONFIG[role].name}, the ${role} responder in IncidentMesh.`,
     `Incident: ${state.incident}. Other participants: ${roster}.`,
     "Return one concise incident hypothesis with a claim, confidence from 0 to 1, and a short root-cause slug.",
-    "Do not treat an unverified peer claim as fact. If proposing rollback, use the rollback_production tool so the Safety Gate can inspect it.",
+    "Do not treat an unverified peer claim as fact. Phase 1 is investigation-only; do not propose or execute mitigations.",
   ].join(" ")
 }
 
@@ -564,7 +585,6 @@ function responderHandlers(
   role: Role,
   state: IncidentState,
   dryRun: boolean,
-  phase1Only: boolean,
   scheduleMode: ScheduleMode,
   simulateDependencyTimeout: boolean,
   model: string,
@@ -605,7 +625,7 @@ function responderHandlers(
         runLoop(participant.getId(), responderPrompt(role, state), {
           model,
           maxOutputTokens,
-          tools: phase1Only ? [] : participant.getTools(),
+          tools: [],
           structuredOutput: MODEL_HYPOTHESIS_OUTPUT,
           context: participant.getMemory().getContext(),
         }, new SafetyGateInterception(state))
@@ -716,7 +736,7 @@ function mitigationPrompt(state: IncidentState): string {
     .map((item) => `- ${item.role}: confidence=${item.confidence.toFixed(2)} rootCause=${item.rootCause} claim=${item.claim}`)
     .join("\n")
   return [
-    "You are the mitigation owner in IncidentMesh. Phase 1 is complete.",
+    "You are the mitigation owner in IncidentMesh. Phase-1 evidence collection is closed for this action phase.",
     `Incident: ${state.incident}.`,
     `Safety Gate: ${state.gateDecision} (${state.gateReason}); aggregate confidence=${state.confidence.toFixed(2)}; contradictions=${state.contradictions}.`,
     "Shared evidence from independent responders:",
@@ -781,8 +801,11 @@ function actionHandlers(
   const providerMitigationPhase: SituationHandler = {
     specification: isPeerType(GATE_DECISION),
     processor: {
-      apply({ participant }) {
+      apply({ participant, event: decisionEvent }) {
         if (dryRun || phase1Only || state.mitigationPhaseStarted || !(participant instanceof Agent)) return
+        if (!state.isSafetyGateProducer(decisionEvent.producerId)) return
+        const payload = decisionEvent.payload as EventPayload
+        if (payload.scope !== "investigation" || payload.decision !== state.gateDecision || payload.gateReason !== state.gateReason) return
         state.mitigationPhaseStarted = true
         state.actionBoundaryMs = null
         sendEvent(event(MITIGATION_PHASE_STARTED, participant.getId(), {
@@ -854,7 +877,7 @@ export function evaluateSafetyGate(
   if (contradictions > 0) {
     return { decision: "blocked", reason: "conflicting-evidence", confidence, contradictions, availableRoles, missingRequiredRoles }
   }
-  if (!Number.isFinite(confidence) || confidence < 0.8) {
+  if (!Number.isFinite(confidence) || authoritative.some((item) => item.confidence < 0.8)) {
     return { decision: "blocked", reason: "low-confidence-evidence", confidence, contradictions, availableRoles, missingRequiredRoles }
   }
   return { decision: "approved", reason: "sufficient-consistent-evidence", confidence, contradictions, availableRoles, missingRequiredRoles }
@@ -941,7 +964,9 @@ function gateHandlers(state: IncidentState, sendEvent: (event: SemanticEvent, se
         const payload = degradedEvent.payload as EventPayload
         const role = payload.role
         if (typeof role !== "string" || !ROLES.includes(role as Role)) return
-        if (state.markDegraded(role as Role)) emitInvestigationGateDecision(state, participant.getId(), sendEvent, "degradation")
+        const typedRole = role as Role
+        if (!state.isResponderProducer(typedRole, degradedEvent.producerId)) return
+        if (state.markDegraded(typedRole)) emitInvestigationGateDecision(state, participant.getId(), sendEvent, "degradation")
       },
     },
   }
@@ -1088,13 +1113,14 @@ export async function runIncidentScenario(options: ScenarioOptions = {}): Promis
     handlers: [...observerHandlers(state), ...frameworkObserverHandlers(state)],
   })
   const gate = createHuman({ name: "Safety Gate", capabilities: ["risk-control", "interception"], handlers: gateHandlers(state, sendEvent) })
+  state.registerSafetyGate(gate.getId())
   const responders = ROLES.map((role) => {
     const responder = createAgent({
       name: ROLE_CONFIG[role].name,
       capabilities: [ROLE_CONFIG[role].capability, "concurrent-response"],
       instruction: `You are the ${role} responder. Work independently, publish evidence, and react to peer events.`,
-      tools: responderTools,
-      handlers: responderHandlers(role, state, dryRun, phase1Only, scheduleMode, simulateDependencyTimeout, model, maxOutputTokens, runLoop, sendEvent),
+      tools: [],
+      handlers: responderHandlers(role, state, dryRun, scheduleMode, simulateDependencyTimeout, model, maxOutputTokens, runLoop, sendEvent),
     })
     state.registerResponder(role, responder.getId())
     return responder
@@ -1163,7 +1189,12 @@ export async function runIncidentScenario(options: ScenarioOptions = {}): Promis
     if (dryRun && state.gateDecision === "blocked" && state.evidence.length < expectedFollowupEvidence) return false
     if (dryRun && (!state.actionProposed || state.actionExecutedTool === null)) return false
     if (!dryRun && !phase1Only && (!state.mitigationPhaseStarted || state.modelMitigationRecommendation === null)) return false
-    if (!dryRun && phase1Only && (state.hypotheses.length < ROLES.length || !ROLES.every((role) => state.spans.get(role)?.completedAtMs !== undefined))) return false
+    if (!dryRun && phase1Only) {
+      const phaseClosed = ROLES.every((role) =>
+        state.spans.get(role)?.completedAtMs !== undefined
+        && (state.hypotheses.some((item) => item.role === role) || state.degradedRoles.includes(role)))
+      if (!phaseClosed) return false
+    }
     return true
   }, timeoutMs)
   clearTimeout(evidenceDeadlineTimer)
