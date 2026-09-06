@@ -2,8 +2,8 @@
 
 | Judge concern | Artifact | Exact supported claim | Limitation |
 | --- | --- | --- | --- |
-| Real model concurrency | [`../evidence/real-provider-run.md`](../evidence/real-provider-run.md) | One authenticated Google `gemini-3.5-flash-lite` execution has 1,389 ms common three-way responder overlap and 3/3 structured hypotheses. | One historical bounded capture. |
-| Real provider Phase 2 | Same receipt/JSON | Gemini proposes rollback; Mozaik interception occurs; request_corroboration executes; provider follow-up is recorded. | Captured on the receipt's recorded commit, not relabeled as final-SHA evidence. |
+| Fresh release-runtime model concurrency | [`../evidence/release-phase1-provider-run.md`](../evidence/release-phase1-provider-run.md) | One authenticated Google `gemini-3.5-flash-lite` execution against frozen release runtime `e98376445c42ea532cbe4993095911d932a3a57a` has 1,363 ms common three-way responder provider-call overlap and 3/3 accepted hypotheses. | Scoped to Phase 1; the stochastic run did not propose `rollback_production`, so it does not certify authenticated Phase 2. |
+| Historical full provider path | [`../evidence/real-provider-run.md`](../evidence/real-provider-run.md) and JSON | One authenticated historical execution has 1,389 ms common three-way responder overlap; Gemini proposes rollback; Mozaik interception occurs; `request_corroboration` executes; provider follow-up is recorded. | Captured on the receipt's recorded commit, not relabeled as release-SHA Phase-2 evidence. |
 | Concurrency changes decision validity | [`../evidence/stale-plan-ablation.md`](../evidence/stale-plan-ablation.md) | Same revision-1 plan/action/evidence/policy/boundary; concurrent peer progress produces boundary revision 3 and stale invalidation; serialization stays revision 1 and permits the bounded proposal. | Deterministic replay of frozen provider outputs; bounded tool is proposal-only. |
 | Fresh replan sees new truth | Same stale-plan receipt | After stale rewrite, a fresh revision-3 planning pass sees the complete conflict and remains blocked. | Deterministic planner fixture. |
 | Scheduling improves safe-action availability | [`../evidence/safe-action-ablation.md`](../evidence/safe-action-ablation.md) | Both rollback arms fail closed; concurrent complete conflict enables targeted safe planning while sequential missing evidence requires a hold. | Configured fixture boundary, not MTTR. |
@@ -13,4 +13,4 @@
 | Degradation | [`../evidence/degradation.md`](../evidence/degradation.md) | Missing required responder closes, revision advances, action fails closed, safe tool executes. | Deterministic degradation fixture. |
 | Semantic stability | [`../evidence/semantic-stability.md`](../evidence/semantic-stability.md) | 100 arm executions preserve both causal projections with zero semantic mismatches. | Wall-clock timing is deliberately excluded; this is not a latency claim. |
 
-One sentence: **Real providers overlap; concurrent peer progress can invalidate in-flight planning; immutable Mozaik action boundaries prevent stale or unsafe tools from crossing.**
+One sentence: **Fresh release-runtime provider calls overlap; concurrent peer progress can invalidate in-flight planning; immutable Mozaik action boundaries prevent stale or unsafe tools from crossing.**

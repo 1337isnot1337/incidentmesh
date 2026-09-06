@@ -55,11 +55,31 @@ Destructive rollback remains unauthorized in both arms.
 
 Readable result: [`evidence/stale-plan-ablation.md`](evidence/stale-plan-ablation.md)
 
-## 3. Inspect the real Gemini receipt
+## 3. Inspect the real Gemini evidence
+
+### Fresh release-runtime Phase 1
+
+A fresh authenticated Google `gemini-3.5-flash-lite` capture against frozen release runtime `e98376445c42ea532cbe4993095911d932a3a57a` records:
+
+- Trace: 4 → 1,458 ms
+- Dependency: 4 → 1,495 ms
+- Impact: 4 → 1,367 ms
+- **1,363 ms common three-way provider-call overlap**
+- 3 / 3 responder hypotheses accepted
+- shared gate reaches `blocked`
+- no production mutation observed
+
+Readable scoped receipt: [`evidence/release-phase1-provider-run.md`](evidence/release-phase1-provider-run.md)
+
+Scoped manifest: [`evidence/release-phase1-provider-manifest.json`](evidence/release-phase1-provider-manifest.json)
+
+This stochastic release-SHA run did **not** produce a `rollback_production` proposal, so it does not claim a fresh authenticated Phase-2 interception. The full-evidence validator correctly rejected it for that broader claim while the observed Phase-1 provider intervals remain the fresh release-runtime concurrency evidence.
+
+### Historical full provider path
 
 ![Authenticated Gemini provider run](assets/gemini-proof.svg)
 
-The historical authenticated Google `gemini-3.5-flash-lite` receipt records:
+The preserved historical authenticated Google `gemini-3.5-flash-lite` receipt records:
 
 - Trace: 2 → 1,392 ms
 - Dependency: 3 → 1,584 ms
@@ -72,11 +92,11 @@ The historical authenticated Google `gemini-3.5-flash-lite` receipt records:
 - the safe tool executes
 - the provider returns a follow-up recommendation
 
-Readable receipt: [`evidence/real-provider-run.md`](evidence/real-provider-run.md)
+Readable historical receipt: [`evidence/real-provider-run.md`](evidence/real-provider-run.md)
 
-Raw evidence: [`evidence/real-provider-run.json`](evidence/real-provider-run.json)
+Historical raw evidence: [`evidence/real-provider-run.json`](evidence/real-provider-run.json)
 
-This is a historical bounded provider run from its recorded source commit. It is not relabeled as final-SHA evidence, and overlapping provider calls are not presented as proof of simultaneous token generation inside the model server.
+The historical full receipt remains tied to its recorded source commit; it is not relabeled as release-SHA Phase-2 evidence. Neither receipt presents overlapping provider calls as proof of simultaneous token generation inside the model server.
 
 ## 4. Check the stress result
 
@@ -110,7 +130,7 @@ The current suite has 37 focused tests covering concurrent responder behavior, r
 
 ## The whole project in one sentence
 
-**Real providers overlap; concurrent peer progress can invalidate in-flight planning; immutable Mozaik action boundaries prevent stale or unsafe tools from crossing.**
+**Fresh release-runtime provider calls overlap; concurrent peer progress can invalidate in-flight planning; immutable Mozaik action boundaries prevent stale or unsafe tools from crossing.**
 
 ## Deeper evidence
 
@@ -124,4 +144,4 @@ The current suite has 37 focused tests covering concurrent responder behavior, r
 
 IncidentMesh is a hackathon prototype.
 
-`targeted_canary_probe` and `rollback_production` are proposal-only fixtures. No tool mutates production. The project does not claim production readiness, MTTR improvement, generic speedup, or dynamic modification of prompts already in flight.
+The fresh release-SHA Gemini capture proves authenticated Phase-1 provider overlap only. The historical authenticated receipt remains the complete provider-backed Phase-2 interception/follow-up artifact from its recorded commit. `targeted_canary_probe` and `rollback_production` are proposal-only fixtures. No tool mutates production. The project does not claim production readiness, MTTR improvement, generic speedup, or dynamic modification of prompts already in flight.
