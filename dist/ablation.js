@@ -29,12 +29,14 @@ const result = {
     constants: {
         incident: concurrent.incident,
         evidence: normalizeEvidence(concurrent),
-        gatePolicy: "at the fixed action boundary, approve when available evidence has mean confidence >= 0.8 and zero contradictions; otherwise block; later evidence may tighten the gate but cannot retroactively intercept an action that already crossed the boundary",
+        gatePolicy: "at the configured action-boundary callback, approve when available evidence has mean confidence >= 0.8 and zero contradictions; otherwise block; later evidence may tighten the gate but cannot retroactively intercept an action that already crossed the boundary",
         proposedAction: concurrent.action.requestedTool,
         actionBoundaryMs: boundaryMs,
+        timerSemantics: "configured JavaScript timer boundary; observed callback time is reported separately and may be later under scheduler load",
     },
     changedVariable: "evidence scheduling only",
     concurrent: {
+        attemptedAtMs: concurrent.action.attemptedAtMs,
         hypothesesAtBoundary: concurrent.action.hypothesesAtBoundary,
         contradictionsAtBoundary: concurrent.action.contradictionsAtBoundary,
         gateAtBoundary: concurrent.action.gateAtBoundary,
@@ -43,6 +45,7 @@ const result = {
         finalGate: concurrent.gateDecision,
     },
     sequential: {
+        attemptedAtMs: sequential.action.attemptedAtMs,
         hypothesesAtBoundary: sequential.action.hypothesesAtBoundary,
         contradictionsAtBoundary: sequential.action.contradictionsAtBoundary,
         gateAtBoundary: sequential.action.gateAtBoundary,
@@ -50,7 +53,7 @@ const result = {
         executedTool: sequential.action.executedTool,
         finalGate: sequential.gateDecision,
     },
-    causalFinding: "Concurrent availability puts contradictory evidence inside the safety boundary before the fixed action deadline; sequential availability reaches the same final evidence too late to intercept the rollback tool at that boundary.",
+    causalFinding: "Concurrent availability puts contradictory evidence inside the safety boundary before the configured action-boundary callback; sequential availability reaches the same final evidence too late to intercept the rollback tool when that callback runs.",
     limitation: "The rollback tool is proposal-only; this ablation demonstrates control-flow escape across the safety boundary, not a real production rollback.",
 };
 console.log(JSON.stringify(result, null, 2));
