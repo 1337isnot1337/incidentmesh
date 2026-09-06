@@ -13,21 +13,21 @@
       "claim": "p95 latency jumped on checkout requests before the error spike",
       "confidence": 0.85,
       "rootCause": "cache-stampede",
-      "atMs": 83
+      "atMs": 80
     },
     {
       "role": "dependency",
       "claim": "deploy 8f3 correlates with database-pool wait and queue growth",
       "confidence": 0.82,
       "rootCause": "deploy-8f3",
-      "atMs": 133
+      "atMs": 130
     },
     {
       "role": "impact",
       "claim": "38% of checkout attempts fail for users in us-east",
       "confidence": 0.88,
       "rootCause": "regional-impact",
-      "atMs": 183
+      "atMs": 180
     }
   ],
   "evidence": [
@@ -42,13 +42,13 @@
     "proposed": true,
     "requestedTool": "rollback_production",
     "boundaryMs": 205,
-    "attemptedAtMs": 209,
+    "attemptedAtMs": 205,
     "gateAtBoundary": "blocked",
     "gateReasonAtBoundary": "conflicting-evidence",
     "hypothesesAtBoundary": 3,
     "contradictionsAtBoundary": 2,
     "boundarySnapshot": {
-      "atMs": 209,
+      "atMs": 205,
       "investigationDecision": "blocked",
       "investigationReason": "conflicting-evidence",
       "decision": "blocked",
@@ -66,59 +66,47 @@
     },
     "boundarySafeAction": "canary-with-targeted-corroboration",
     "actionableSafePlan": "canary-with-targeted-corroboration",
-    "actionableSafePlanAtMs": 209,
+    "actionableSafePlanAtMs": 205,
     "intercepted": true,
     "executedTool": "request_corroboration",
     "mitigationPhaseStarted": false,
     "modelRecommendation": null
   },
   "spans": [
-    {
-      "role": "trace",
-      "startedAtMs": 2,
-      "completedAtMs": 122
-    },
-    {
-      "role": "dependency",
-      "startedAtMs": 3,
-      "completedAtMs": 171
-    },
-    {
-      "role": "impact",
-      "startedAtMs": 3,
-      "completedAtMs": 220
-    }
+    {"role":"trace","startedAtMs":0,"completedAtMs":118},
+    {"role":"dependency","startedAtMs":0,"completedAtMs":168},
+    {"role":"impact","startedAtMs":0,"completedAtMs":218}
   ],
   "timeline": [
-    {"atMs":2,"type":"incident.opened","producer":"Incident Commander","detail":"incident.opened"},
-    {"atMs":2,"type":"incident.span.started","producer":"Trace","detail":"trace started concurrent investigation"},
-    {"atMs":3,"type":"incident.span.started","producer":"Dependency","detail":"dependency started concurrent investigation"},
-    {"atMs":3,"type":"incident.span.started","producer":"Impact","detail":"impact started concurrent investigation"},
-    {"atMs":49,"type":"incident.action.proposed","producer":"Action Controller","detail":"rollback_production is pending; fixed action boundary is 205ms"},
-    {"atMs":83,"type":"incident.hypothesis.emitted","producer":"Trace","detail":"p95 latency jumped on checkout requests before the error spike"},
-    {"atMs":84,"type":"awareness.peer-observed","producer":"Dependency","detail":"Dependency observed trace hypothesis"},
-    {"atMs":84,"type":"awareness.peer-observed","producer":"Impact","detail":"Impact observed trace hypothesis"},
-    {"atMs":122,"type":"incident.span.completed","producer":"Trace","detail":"independent pass complete"},
-    {"atMs":133,"type":"incident.hypothesis.emitted","producer":"Dependency","detail":"deploy 8f3 correlates with database-pool wait and queue growth"},
-    {"atMs":133,"type":"awareness.peer-observed","producer":"Trace","detail":"Trace observed dependency hypothesis"},
-    {"atMs":133,"type":"awareness.peer-observed","producer":"Impact","detail":"Impact observed dependency hypothesis"},
-    {"atMs":171,"type":"incident.span.completed","producer":"Dependency","detail":"independent pass complete"},
-    {"atMs":183,"type":"incident.hypothesis.emitted","producer":"Impact","detail":"38% of checkout attempts fail for users in us-east"},
-    {"atMs":183,"type":"incident.gate.decision","producer":"Safety Gate","detail":"blocked: conflicting-evidence; 2 contradictions across 3 hypotheses; confidence 0.85 (evidence-aggregation)"},
-    {"atMs":183,"type":"awareness.peer-observed","producer":"Trace","detail":"Trace observed impact hypothesis"},
-    {"atMs":183,"type":"awareness.peer-observed","producer":"Dependency","detail":"Dependency observed impact hypothesis"},
-    {"atMs":209,"type":"incident.action.execution-requested","producer":"Action Controller","detail":"action boundary reached with hypotheses=3, contradictions=2"},
-    {"atMs":209,"type":"incident.gate.decision","producer":"Safety Gate","detail":"blocked: conflicting-evidence; boundary hypotheses=3, missing=none"},
-    {"atMs":212,"type":"mozaik.interception.started","producer":"Action Controller","detail":"InterceptionHandler received rollback_production"},
-    {"atMs":212,"type":"mozaik.interception.rewritten","producer":"Safety Gate","detail":"rewrote rollback_production -> request_corroboration (conflicting-evidence)"},
-    {"atMs":212,"type":"mozaik.interception.finished","producer":"Action Controller","detail":"InterceptionHandler returned request_corroboration"},
-    {"atMs":212,"type":"mozaik.function-call.started","producer":"Action Controller","detail":"Mozaik executing request_corroboration"},
-    {"atMs":213,"type":"incident.action.safe-executed","producer":"Action Controller","detail":"safe tool executed for blocked rollback_production"},
-    {"atMs":213,"type":"mozaik.function-call.completed","producer":"Action Controller","detail":"Mozaik function tool completed"},
-    {"atMs":220,"type":"incident.span.completed","producer":"Impact","detail":"independent pass complete"},
-    {"atMs":245,"type":"incident.mitigation.replanned","producer":"Impact","detail":"switched from rollback to a canary plus targeted corroboration"},
-    {"atMs":269,"type":"incident.evidence.added","producer":"Trace","detail":"Trace supplied corroboration for the canary plan"},
-    {"atMs":287,"type":"incident.evidence.added","producer":"Dependency","detail":"Dependency supplied corroboration for the canary plan"}
+    {"atMs":0,"type":"incident.opened","producer":"Incident Commander","detail":"incident.opened"},
+    {"atMs":0,"type":"incident.span.started","producer":"Trace","detail":"trace started concurrent investigation"},
+    {"atMs":0,"type":"incident.span.started","producer":"Dependency","detail":"dependency started concurrent investigation"},
+    {"atMs":0,"type":"incident.span.started","producer":"Impact","detail":"impact started concurrent investigation"},
+    {"atMs":45,"type":"incident.action.proposed","producer":"Action Controller","detail":"rollback_production is pending; fixed action boundary is 205ms"},
+    {"atMs":80,"type":"incident.hypothesis.emitted","producer":"Trace","detail":"p95 latency jumped on checkout requests before the error spike"},
+    {"atMs":80,"type":"awareness.peer-observed","producer":"Dependency","detail":"Dependency observed trace hypothesis"},
+    {"atMs":80,"type":"awareness.peer-observed","producer":"Impact","detail":"Impact observed trace hypothesis"},
+    {"atMs":118,"type":"incident.span.completed","producer":"Trace","detail":"independent pass complete"},
+    {"atMs":130,"type":"incident.hypothesis.emitted","producer":"Dependency","detail":"deploy 8f3 correlates with database-pool wait and queue growth"},
+    {"atMs":130,"type":"awareness.peer-observed","producer":"Trace","detail":"Trace observed dependency hypothesis"},
+    {"atMs":130,"type":"awareness.peer-observed","producer":"Impact","detail":"Impact observed dependency hypothesis"},
+    {"atMs":168,"type":"incident.span.completed","producer":"Dependency","detail":"independent pass complete"},
+    {"atMs":180,"type":"incident.hypothesis.emitted","producer":"Impact","detail":"38% of checkout attempts fail for users in us-east"},
+    {"atMs":180,"type":"incident.gate.decision","producer":"Safety Gate","detail":"blocked: conflicting-evidence; 2 contradictions across 3 hypotheses; confidence 0.85 (evidence-aggregation)"},
+    {"atMs":180,"type":"awareness.peer-observed","producer":"Trace","detail":"Trace observed impact hypothesis"},
+    {"atMs":180,"type":"awareness.peer-observed","producer":"Dependency","detail":"Dependency observed impact hypothesis"},
+    {"atMs":205,"type":"incident.action.execution-requested","producer":"Action Controller","detail":"action boundary reached with hypotheses=3, contradictions=2"},
+    {"atMs":205,"type":"incident.gate.decision","producer":"Safety Gate","detail":"blocked: conflicting-evidence; boundary hypotheses=3, missing=none"},
+    {"atMs":205,"type":"mozaik.interception.started","producer":"Action Controller","detail":"InterceptionHandler received rollback_production"},
+    {"atMs":205,"type":"mozaik.interception.rewritten","producer":"Safety Gate","detail":"rewrote rollback_production -> request_corroboration (conflicting-evidence)"},
+    {"atMs":205,"type":"mozaik.interception.finished","producer":"Action Controller","detail":"InterceptionHandler returned request_corroboration"},
+    {"atMs":205,"type":"mozaik.function-call.started","producer":"Action Controller","detail":"Mozaik executing request_corroboration"},
+    {"atMs":205,"type":"incident.action.safe-executed","producer":"Action Controller","detail":"safe tool executed for blocked rollback_production"},
+    {"atMs":205,"type":"mozaik.function-call.completed","producer":"Action Controller","detail":"Mozaik function tool completed"},
+    {"atMs":218,"type":"incident.span.completed","producer":"Impact","detail":"independent pass complete"},
+    {"atMs":240,"type":"incident.mitigation.replanned","producer":"Impact","detail":"switched from rollback to a canary plus targeted corroboration"},
+    {"atMs":264,"type":"incident.evidence.added","producer":"Trace","detail":"Trace supplied corroboration for the canary plan"},
+    {"atMs":282,"type":"incident.evidence.added","producer":"Dependency","detail":"Dependency supplied corroboration for the canary plan"}
   ],
-  "elapsedMs": 287
+  "elapsedMs": 282
 }
