@@ -1,53 +1,87 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="470" viewBox="0 0 1200 470" role="img" aria-labelledby="title desc">
-  <title id="title">IncidentMesh disagreement changes the allowed action</title>
-  <desc id="desc">Trace, Dependency, and Impact investigate concurrently. Three distinct hypotheses enter shared IncidentState, producing two contradictions. The Safety Gate blocks rollback, Impact replans to a canary, and Trace and Dependency corroborate.</desc>
-  <rect width="1200" height="470" rx="24" fill="#0b1220"/>
-  <rect x="1" y="1" width="1198" height="468" rx="23" fill="none" stroke="#334155" stroke-width="2"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="350" viewBox="0 0 1200 350" role="img" aria-labelledby="title desc">
+  <title id="title">IncidentMesh: concurrent evidence blocks and rewrites an unsafe production action</title>
+  <desc id="desc">Trace, Dependency, and Impact feed shared IncidentState. Three distinct hypotheses create two contradictions, so the Safety Gate is blocked. At the fixed action boundary, rollback_production is intercepted by Mozaik and rewritten to request_corroboration. Impact then replans to a canary.</desc>
 
-  <text x="54" y="58" fill="#f8fafc" font-size="28" font-family="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-weight="700">Disagreement changes what the system is allowed to do.</text>
-  <text x="54" y="88" fill="#94a3b8" font-size="16" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">one incident.opened event → three independent responder lifecycles</text>
+  <rect width="1200" height="350" rx="14" fill="#0d1117"/>
+  <rect x="0.75" y="0.75" width="1198.5" height="348.5" rx="13.25" fill="none" stroke="#30363d" stroke-width="1.5"/>
 
-  <rect x="54" y="126" width="200" height="58" rx="12" fill="#0c4a6e" stroke="#38bdf8"/>
-  <rect x="54" y="198" width="200" height="58" rx="12" fill="#115e59" stroke="#2dd4bf"/>
-  <rect x="54" y="270" width="200" height="58" rx="12" fill="#4c1d95" stroke="#a78bfa"/>
-  <text x="78" y="150" fill="#e0f2fe" font-size="18" font-family="ui-sans-serif, system-ui, sans-serif" font-weight="700">Trace</text>
-  <text x="78" y="172" fill="#bae6fd" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">hypothesis A</text>
-  <text x="78" y="222" fill="#ccfbf1" font-size="18" font-family="ui-sans-serif, system-ui, sans-serif" font-weight="700">Dependency</text>
-  <text x="78" y="244" fill="#99f6e4" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">hypothesis B</text>
-  <text x="78" y="294" fill="#ede9fe" font-size="18" font-family="ui-sans-serif, system-ui, sans-serif" font-weight="700">Impact</text>
-  <text x="78" y="316" fill="#ddd6fe" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">hypothesis C</text>
+  <!-- Product identity -->
+  <g transform="translate(38 27)">
+    <rect x="0" y="0" width="48" height="48" rx="10" fill="#161b22" stroke="#3d444d"/>
+    <path d="M13 13 L24 24 L35 13 M13 35 L24 24 L35 35" fill="none" stroke="#8c959f" stroke-width="2.5" stroke-linecap="round"/>
+    <circle cx="13" cy="13" r="3.75" fill="#58a6ff"/>
+    <circle cx="35" cy="13" r="3.75" fill="#58a6ff"/>
+    <circle cx="13" cy="35" r="3.75" fill="#58a6ff"/>
+    <circle cx="35" cy="35" r="3.75" fill="#d29922"/>
+    <rect x="19" y="19" width="10" height="10" rx="2.5" fill="#f0f6fc"/>
+    <path d="M21.6 24 l1.7 1.8 3.5-4" fill="none" stroke="#0d1117" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="100" y="53" fill="#f0f6fc" font-size="29" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-weight="680" letter-spacing="-0.5">IncidentMesh</text>
+  <text x="101" y="72" fill="#8b949e" font-size="10.5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" letter-spacing="1.35">CONCURRENT INCIDENT CONTROL</text>
 
-  <path d="M254 155 C315 155 323 202 372 217" fill="none" stroke="#38bdf8" stroke-width="2.5"/>
-  <path d="M254 227 H372" fill="none" stroke="#2dd4bf" stroke-width="2.5"/>
-  <path d="M254 299 C315 299 323 252 372 237" fill="none" stroke="#a78bfa" stroke-width="2.5"/>
+  <text x="38" y="112" fill="#f0f6fc" font-size="23" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-weight="620" letter-spacing="-0.25">Concurrent incident response that stops unsafe actions before incomplete evidence reaches production.</text>
+  <text x="38" y="139" fill="#8b949e" font-size="13.5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">Parallel responders → shared evidence → Safety Gate → real Mozaik interception → safe mitigation</text>
 
-  <rect x="372" y="158" width="250" height="138" rx="16" fill="#111827" stroke="#64748b" stroke-width="2"/>
-  <text x="397" y="190" fill="#f8fafc" font-size="19" font-family="ui-sans-serif, system-ui, sans-serif" font-weight="700">Shared IncidentState</text>
-  <text x="397" y="220" fill="#cbd5e1" font-size="14" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">3 distinct root-cause hypotheses</text>
-  <text x="397" y="247" fill="#fbbf24" font-size="17" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-weight="700">2 contradictions</text>
-  <text x="397" y="274" fill="#94a3b8" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">aggregate confidence 0.85</text>
+  <line x1="38" y1="158" x2="1162" y2="158" stroke="#21262d"/>
 
-  <path d="M622 227 H686" fill="none" stroke="#f59e0b" stroke-width="3"/>
-  <path d="M677 219 L688 227 L677 235" fill="none" stroke="#f59e0b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Responder mesh -->
+  <text x="38" y="181" fill="#6e7681" font-size="10" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" letter-spacing="1.1">PARALLEL RESPONDERS</text>
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12.5">
+    <rect x="38" y="193" width="137" height="28" rx="5" fill="#161b22" stroke="#3d444d"/>
+    <rect x="38" y="226" width="137" height="28" rx="5" fill="#161b22" stroke="#3d444d"/>
+    <rect x="38" y="259" width="137" height="28" rx="5" fill="#161b22" stroke="#3d444d"/>
+    <circle cx="52" cy="207" r="3" fill="#58a6ff"/><text x="62" y="211" fill="#c9d1d9">Trace</text>
+    <circle cx="52" cy="240" r="3" fill="#58a6ff"/><text x="62" y="244" fill="#c9d1d9">Dependency</text>
+    <circle cx="52" cy="273" r="3" fill="#58a6ff"/><text x="62" y="277" fill="#c9d1d9">Impact</text>
+  </g>
+  <path d="M175 207 C194 207 194 228 211 228 M175 240 H211 M175 273 C194 273 194 252 211 252" fill="none" stroke="#484f58" stroke-width="1.5"/>
+  <path d="M202 234 L212 240 L202 246" fill="none" stroke="#8c959f" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
 
-  <rect x="688" y="158" width="208" height="138" rx="16" fill="#18120a" stroke="#f59e0b" stroke-width="2.5"/>
-  <text x="714" y="190" fill="#fde68a" font-size="19" font-family="ui-sans-serif, system-ui, sans-serif" font-weight="700">SAFETY GATE</text>
-  <text x="714" y="235" fill="#fca5a5" font-size="24" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-weight="800">BLOCKED</text>
-  <text x="714" y="268" fill="#cbd5e1" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">rollback not allowed</text>
+  <!-- Shared state -->
+  <text x="224" y="181" fill="#6e7681" font-size="10" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" letter-spacing="1.1">SHARED EVIDENCE</text>
+  <rect x="224" y="193" width="176" height="94" rx="6" fill="#161b22" stroke="#3d444d"/>
+  <text x="239" y="217" fill="#f0f6fc" font-size="13" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-weight="600">IncidentState</text>
+  <text x="239" y="240" fill="#8b949e" font-size="11.5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">3 distinct hypotheses</text>
+  <text x="239" y="261" fill="#d29922" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-weight="700">2 contradictions</text>
+  <text x="239" y="278" fill="#6e7681" font-size="10.5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">confidence 0.85</text>
+  <path d="M400 240 H424" stroke="#8c959f" stroke-width="1.5"/><path d="M416 234 L425 240 L416 246" fill="none" stroke="#8c959f" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
 
-  <path d="M896 227 H942" fill="none" stroke="#f59e0b" stroke-width="3"/>
-  <path d="M933 219 L944 227 L933 235" fill="none" stroke="#f59e0b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Gate -->
+  <text x="437" y="181" fill="#6e7681" font-size="10" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" letter-spacing="1.1">POLICY</text>
+  <rect x="437" y="193" width="153" height="94" rx="6" fill="#1c1710" stroke="#9e6a03"/>
+  <text x="452" y="217" fill="#d29922" font-size="11" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" letter-spacing="0.8">SAFETY GATE</text>
+  <text x="452" y="247" fill="#f85149" font-size="19" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-weight="800">BLOCKED</text>
+  <text x="452" y="269" fill="#8b949e" font-size="10.5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">rollback denied</text>
+  <path d="M590 240 H616" stroke="#d29922" stroke-width="1.7"/><path d="M608 234 L617 240 L608 246" fill="none" stroke="#d29922" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
 
-  <rect x="944" y="126" width="202" height="202" rx="16" fill="#0f1a14" stroke="#22c55e" stroke-width="2.5"/>
-  <text x="968" y="160" fill="#86efac" font-size="18" font-family="ui-sans-serif, system-ui, sans-serif" font-weight="700">Behavior changes</text>
-  <text x="968" y="198" fill="#f8fafc" font-size="15" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">Impact → canary</text>
-  <line x1="968" y1="216" x2="1120" y2="216" stroke="#334155"/>
-  <text x="968" y="248" fill="#f8fafc" font-size="14" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">Trace → corroborate</text>
-  <text x="968" y="276" fill="#f8fafc" font-size="14" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">Dependency → corroborate</text>
-  <text x="968" y="307" fill="#86efac" font-size="13" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">2 follow-up evidence events</text>
+  <!-- Action boundary / interception -->
+  <text x="630" y="181" fill="#6e7681" font-size="10" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" letter-spacing="1.1">ACTION BOUNDARY · 205 ms FIXTURE</text>
+  <line x1="621" y1="193" x2="621" y2="287" stroke="#30363d" stroke-dasharray="3 4"/>
 
-  <rect x="54" y="372" width="1092" height="52" rx="12" fill="#111827"/>
-  <text x="78" y="404" fill="#cbd5e1" font-size="15" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">concurrency proof: 3 / 3 responder pairs overlap</text>
-  <text x="542" y="404" fill="#94a3b8" font-size="15" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">peer events observed while work is active</text>
-  <text x="928" y="404" fill="#94a3b8" font-size="15" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">provider-free demo</text>
+  <rect x="630" y="193" width="158" height="41" rx="5" fill="#161b22" stroke="#6e7681"/>
+  <text x="644" y="218" fill="#f0f6fc" font-size="12.5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">rollback_production</text>
+
+  <path d="M788 213.5 H811" stroke="#8c959f" stroke-width="1.5"/><path d="M803 207.5 L812 213.5 L803 219.5" fill="none" stroke="#8c959f" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <rect x="813" y="193" width="119" height="41" rx="5" fill="#2d1516" stroke="#f85149"/>
+  <text x="826" y="211" fill="#ff7b72" font-size="9.5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" letter-spacing="0.85">MOZAIK</text>
+  <text x="826" y="224" fill="#f0f6fc" font-size="11.5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-weight="700">INTERCEPTED</text>
+
+  <path d="M932 213.5 H954" stroke="#f85149" stroke-width="1.5"/><path d="M946 207.5 L955 213.5 L946 219.5" fill="none" stroke="#f85149" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <rect x="956" y="193" width="206" height="41" rx="5" fill="#0f1d16" stroke="#2ea043"/>
+  <text x="970" y="218" fill="#7ee787" font-size="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">request_corroboration</text>
+
+  <path d="M1059 234 V254 H1019" fill="none" stroke="#2ea043" stroke-width="1.5"/>
+  <path d="M1027 248 L1018 254 L1027 260" fill="none" stroke="#2ea043" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="892" y="258" fill="#6e7681" font-size="9.5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">Impact deterministic replan</text>
+  <rect x="1019" y="264" width="143" height="23" rx="4" fill="#0f1d16" stroke="#2ea043"/>
+  <text x="1059" y="280" fill="#7ee787" font-size="11" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-weight="700">CANARY</text>
+
+  <!-- Proof row -->
+  <line x1="38" y1="306" x2="1162" y2="306" stroke="#21262d"/>
+  <text x="38" y="331" fill="#8b949e" font-size="11.5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
+    <tspan fill="#c9d1d9">3/3 responder overlap</tspan><tspan fill="#484f58">  ·  </tspan><tspan fill="#c9d1d9">real interception</tspan><tspan fill="#484f58">  ·  </tspan><tspan fill="#c9d1d9">fail-closed</tspan><tspan fill="#484f58">  ·  </tspan><tspan fill="#c9d1d9">zero-key demo</tspan>
+  </text>
+  <text x="1162" y="331" text-anchor="end" fill="#6e7681" font-size="10.5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">Mozaik 4.0.5</text>
 </svg>
