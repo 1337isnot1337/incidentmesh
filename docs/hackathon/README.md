@@ -1,31 +1,41 @@
 # IncidentMesh judge package
 
-Use the final material in this order:
+Start with **[IncidentMesh in 5 minutes](../judge-guide.md)**. It gives the shortest runnable path through the project and links each claim to its evidence.
 
-1. [`submission.md`](submission.md) — paste-ready JigJoy fields and exact claim boundary.
-2. [`../demo.md`](../demo.md) — concise 80-second narration.
-3. [`final-video-shot-list.md`](final-video-shot-list.md) — exact recording sequence and crops.
-4. [`judge-proof-map.md`](judge-proof-map.md) — question → artifact → supported claim → limitation.
-5. [`final-judge-qa.md`](final-judge-qa.md) — short spoken answers.
-6. [`final-copy-preflight.md`](final-copy-preflight.md) — field length and stale-claim checks.
-7. [`final-submission-checklist.md`](final-submission-checklist.md) — release, resubmission, and logged-out checks.
-8. [`submission-surface-audit.md`](submission-surface-audit.md) — public JigJoy detail-page health.
+## Core material
 
-## Core proof chain
+1. [`../judge-guide.md`](../judge-guide.md) — five-minute walkthrough: demo → stale-plan proof → real Gemini receipt → stress result.
+2. [`submission.md`](submission.md) — paste-ready JigJoy description and concurrency explanation.
+3. [`judge-proof-map.md`](judge-proof-map.md) — exact claim → artifact → limitation map.
+4. [`../implementation.md`](../implementation.md) — full architecture and Mozaik primitive map.
 
-| Layer | Proof |
-| --- | --- |
-| Real concurrency and Phase 2 | Historical authenticated Gemini Flash-Lite receipt: 1,389 ms three-way overlap, rollback proposal, real interception, safe tool, provider follow-up |
-| Causal concurrency | Final-runtime stale-plan ablation: same revision-1 plan; concurrent peers advance the boundary to revision 3 and invalidate it; serialization leaves it fresh |
-| Hard safety | Per-action immutable attempts plus 10,000 seeded cases / 40,000 attempts / zero unauthorized rollback, bounded, or stale non-safe crossings |
-| Supporting safe-action value | Fixed-boundary ablation: both rollback arms fail closed; complete concurrent conflict enables a targeted safe plan while incomplete sequential evidence requires a hold |
+## The proof chain
+
+| Question | Answer | Evidence |
+| --- | --- | --- |
+| Did real model requests overlap? | Yes: three authenticated Gemini responder calls have **1,389 ms** of common provider-call overlap. | [`../evidence/real-provider-run.md`](../evidence/real-provider-run.md) |
+| Does concurrency change behavior? | Yes: the same revision-1 plan is stale under concurrent peer progress and still fresh at the serialized boundary. | [`../evidence/stale-plan-ablation.md`](../evidence/stale-plan-ablation.md) |
+| Does the action boundary really enforce the decision? | Yes: `rollback_production` is intercepted and rewritten to `request_corroboration`. | real-provider receipt + canonical replay |
+| Is safety only demonstrated once? | No: the seeded stress receipt covers 10,000 cases / 40,000 immutable attempts with zero recorded unauthorized rollback or stale non-safe crossings. | [`../evidence/safety-stress.md`](../evidence/safety-stress.md) |
+
+**Core idea:** concurrency changes which decisions are still valid.
+
+## Submission operations and archive
+
+These files preserve the release/submission process. They are not required to understand the project:
+
+- [`final-judge-qa.md`](final-judge-qa.md) — short spoken answers.
+- [`final-copy-preflight.md`](final-copy-preflight.md) — field-length and claim checks.
+- [`final-submission-checklist.md`](final-submission-checklist.md) — release/resubmission checklist.
+- [`submission-surface-audit.md`](submission-surface-audit.md) — public JigJoy page verification history.
+- [`release-notes.md`](release-notes.md) — release summary.
+- [`status.md`](status.md) — frozen release status.
+- [`rules.md`](rules.md) — captured hackathon requirements.
 
 ## Claim boundary
 
-- The authenticated receipt is historical evidence from its recorded commit; it is not relabeled as final-SHA output.
-- The final-runtime causal replay freezes that receipt's exact hypotheses and changes scheduling deterministically.
+- The authenticated provider receipt is historical evidence from its recorded source commit; it is not relabeled as final-SHA provider output.
+- The final-runtime stale-plan counterfactual replays that receipt's frozen hypotheses under deterministic schedules.
 - Phase-1 prompts are independent and are not edited while in flight.
 - `targeted_canary_probe` and `rollback_production` are proposal-only fixtures.
-- No production mutation, production readiness, MTTR, or generic speedup claim is made.
-
-Final line: **Concurrency does not just make IncidentMesh faster. It changes which decisions are still valid.**
+- No production mutation, production-readiness, MTTR, generic speedup, or simultaneous-token-generation claim is made.
