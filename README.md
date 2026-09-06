@@ -18,7 +18,7 @@ If new evidence arrives before that plan acts, IncidentMesh compares the revisio
 
 **Concurrency changes which decisions are still valid.**
 
-[Watch the demo](https://www.youtube.com/watch?v=ohw8Ybt_dIM) · [Quick start](#quick-start) · [Why concurrency matters](#why-concurrency-matters) · [Real Gemini run](#one-real-gemini-run) · [Evidence](#evidence) · [Judge guide](docs/judge-guide.md)
+[Watch the demo](https://www.youtube.com/watch?v=ohw8Ybt_dIM) · [Quick start](#quick-start) · [Why concurrency matters](#why-concurrency-matters) · [Gemini evidence](#real-gemini-evidence) · [Evidence](#evidence) · [Judge guide](docs/judge-guide.md)
 
 ## Watch the 83-second demo
 
@@ -70,29 +70,33 @@ The later evidence is identical in both arms. The difference is scheduling.
 
 [Read the causal receipt](docs/evidence/stale-plan-ablation.md) · [Inspect the JSON](docs/evidence/stale-plan-ablation.json)
 
-## One real Gemini run
+## Real Gemini evidence
+
+A fresh authenticated Google `gemini-3.5-flash-lite` capture against frozen release runtime `e98376445c42ea532cbe4993095911d932a3a57a` records Trace, Dependency, and Impact provider calls in flight together for **1,363 ms**. All three responder hypotheses were accepted and the shared gate reached `BLOCKED`.
+
+That release-SHA run is deliberately scoped to **Phase 1**: its stochastic Phase-2 execution did not propose `rollback_production`, so it does not claim a fresh authenticated interception rewrite. [Release-SHA Phase-1 receipt](docs/evidence/release-phase1-provider-run.md) · [Scoped manifest](docs/evidence/release-phase1-provider-manifest.json)
+
+The earlier authenticated run below remains the evidence for the complete provider-backed Phase-2 path.
 
 <picture>
   <source media="(max-width: 600px)" srcset="docs/assets/gemini-proof-narrow.svg" />
   <img src="docs/assets/gemini-proof.svg" alt="Authenticated historical Gemini run: Trace, Dependency, and Impact calls overlap for 1,389 ms; rollback_production is intercepted and rewritten to request_corroboration before provider follow-up." width="960" />
 </picture>
 
-A historical authenticated run on Google `gemini-3.5-flash-lite` records all three responder provider calls in flight together for **1,389 ms**. After all three hypotheses arrive, the shared gate is `BLOCKED — conflicting-evidence`.
+That historical run records all three responder provider calls in flight together for **1,389 ms**, then records the Action Controller proposing `rollback_production`, Mozaik's `SafetyGateInterception` rewriting it to `request_corroboration`, the safe tool executing, and a provider follow-up.
 
-The same run then records the Action Controller proposing `rollback_production`, Mozaik's `SafetyGateInterception` rewriting it to `request_corroboration`, the safe tool executing, and a provider follow-up.
+It remains tied to its recorded source commit; it is not relabeled as release-SHA Phase-2 evidence. Neither provider receipt claims simultaneous token generation inside the provider.
 
-This is one authenticated provider receipt from its recorded source commit. It is not relabeled as a final-SHA run, and it does not claim simultaneous token generation inside the provider.
-
-[Authenticated receipt](docs/evidence/real-provider-run.md) · [Raw JSON](docs/evidence/real-provider-run.json)
+[Historical full receipt](docs/evidence/real-provider-run.md) · [Historical raw JSON](docs/evidence/real-provider-run.json)
 
 ## Proof at a glance
 
-- **Real concurrency:** three authenticated Gemini responder calls have **1,389 ms** of common provider-call overlap.
+- **Fresh release-SHA concurrency:** three authenticated Gemini responder calls against `e983764...` have **1,363 ms** of common provider-call overlap.
+- **Authenticated Phase 2:** the historical full receipt records `rollback_production` being intercepted and rewritten to `request_corroboration`, followed by provider continuation.
 - **Concurrency changes correctness:** the same revision-1 plan becomes stale under concurrent peer progress but remains fresh at the serialized boundary.
-- **The safety boundary really runs:** `rollback_production` is intercepted and rewritten to `request_corroboration`.
 - **Stress tested:** 10,000 seeded cases / 40,000 immutable action attempts record **0 unauthorized rollback crossings** and **0 stale non-safe crossings**.
 
-The repository keeps the real-provider receipt, deterministic counterfactuals, and stress evidence separate so each claim has a clear provenance.
+The repository keeps release-SHA Phase-1 evidence, the historical full provider receipt, deterministic counterfactuals, and stress evidence separate so each claim has a clear provenance.
 
 ## Quick start
 
@@ -137,7 +141,8 @@ Built directly on **Mozaik 4.0.5** using typed shared state, independent partici
 | Question | Best artifact |
 | --- | --- |
 | What is the fastest overview? | [83-second video demo](https://www.youtube.com/watch?v=ohw8Ybt_dIM) |
-| Did real model requests overlap? | [Authenticated Gemini receipt](docs/evidence/real-provider-run.md) |
+| Did real model requests overlap on the frozen release runtime? | [Release-SHA Phase-1 Gemini receipt](docs/evidence/release-phase1-provider-run.md) |
+| Did the authenticated provider path include the Phase-2 interception? | [Historical full Gemini receipt](docs/evidence/real-provider-run.md) |
 | Does concurrency change what action is valid? | [Stale-plan ablation](docs/evidence/stale-plan-ablation.md) |
 | Does Mozaik actually intercept the action? | [Canonical replay](docs/evidence/replay.svg) |
 | Does the policy survive adversarial ordering? | [Safety stress receipt](docs/evidence/safety-stress.md) |
@@ -150,7 +155,8 @@ For a short verification path, see **[IncidentMesh in 5 minutes](docs/judge-guid
 
 IncidentMesh is a hackathon incident-response prototype, not a production integration.
 
-- The authenticated Gemini receipt is one historical bounded run from its recorded commit.
+- The fresh release-SHA Gemini capture proves authenticated Phase-1 provider overlap only; its stochastic Phase 2 did not propose `rollback_production`.
+- The historical authenticated Gemini receipt remains the complete provider-backed Phase-2 interception/follow-up artifact from its recorded commit.
 - The stale-plan counterfactual replays frozen provider hypotheses under deterministic schedules.
 - `targeted_canary_probe` and `rollback_production` are proposal-only fixtures; no tool changes production.
 - The project does not claim production readiness, MTTR improvement, generic speedup, or dynamic editing of prompts already in flight.
