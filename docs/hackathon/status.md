@@ -1,6 +1,6 @@
 # IncidentMesh final-candidate status — 2026-09-06
 
-Repository integration branch: `sol-maxscore-final-integration`.
+Public release: `master` at `ef0c78eb27e4ab0aa514300d1764c2344f2ebd83` (CI success). Source integration branch: `sol-maxscore-final-integration` at `01dfbde9fb87ae135dda8851635cc3ff2f521805`.
 
 ## Proof status
 
@@ -29,4 +29,4 @@ No live production mutation, production readiness, MTTR, generic speedup, or dyn
 
 ## Submission status
 
-The public slug is currently `incidentmesh-40ad9c`. A logged-out check on 2026-09-06 returned HTTP 200 for the gallery detail API, gallery page, and repository, and the detail record listed four screenshots. The public fields still contain the pre-integration description and concurrency explanation; after this branch is merged, final resubmission and a second logged-out verification remain operator release gates. See [`submission-surface-audit.md`](submission-surface-audit.md).
+Final resubmission published at `2026-09-06T15:23:15.057Z` under `incidentmesh-40ad9c`. Logged-out checks returned HTTP 200 for the detail API, gallery page, repository, and all four screenshot URLs. The public description and concurrency explanation exactly match [`submission.md`](submission.md); the CDN image bytes exactly match the local `01 → 04` gallery assets. No demo or deployment URL existed, so both optional fields remain empty. See [`submission-surface-audit.md`](submission-surface-audit.md).
