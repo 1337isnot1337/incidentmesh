@@ -7,6 +7,12 @@
   "approvedCrossings": 988,
   "blockedRewrites": 9012,
   "unauthorizedRollbackCrossings": 0,
+  "staleNonSafeCrossings": 0,
+  "unauthorizedBoundedCrossings": 0,
+  "actionPolicyInvariantViolations": 0,
+  "attemptIsolationViolations": 0,
+  "stalePlanAttempts": 11412,
+  "totalActionAttempts": 40000,
   "snapshotMutationViolations": 0,
   "invariantViolations": [],
   "generatedProfiles": {

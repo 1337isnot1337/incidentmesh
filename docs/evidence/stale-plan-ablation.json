@@ -1,0 +1,226 @@
+{
+  "schema": "incidentmesh.stale-plan-ablation/v1",
+  "source": {
+    "receipt": "docs/evidence/real-provider-run.json",
+    "commit": "65d98f8feda666932fcbace88037c7009b487a35",
+    "provider": "google",
+    "model": "gemini-3.5-flash-lite"
+  },
+  "fixedInputs": {
+    "incident": "checkout-api-us-east",
+    "eventualEvidence": [
+      {
+        "role": "trace",
+        "claim": "Recent deployment introduced a synchronous deadlock in the checkout payment validation flow.",
+        "confidence": 0.85,
+        "rootCause": "payment-validation-deadlock"
+      },
+      {
+        "role": "dependency",
+        "claim": "Dependency health check indicates external payment gateway timeout causing checkout-api-us-east errors.",
+        "confidence": 0.85,
+        "rootCause": "external-gateway-timeout"
+      },
+      {
+        "role": "impact",
+        "claim": "Customer checkout API requests in us-east are failing due to a recent bad deployment in the checkout-api service.",
+        "confidence": 0.85,
+        "rootCause": "bad-deployment"
+      }
+    ],
+    "planner": "same deterministic revision-stamped Action Controller running through Mozaik",
+    "candidateAction": "targeted_canary_probe",
+    "candidateTargetCause": "payment-validation-deadlock",
+    "actionPolicy": "fresh bounded probes require strong, non-degraded, non-contradictory authoritative evidence matching the target cause",
+    "proposalBoundary": "135 ms configured deterministic planner-fixture duration after the same revision-1 start"
+  },
+  "changedVariable": "peer-evidence scheduling relative to the same in-flight plan",
+  "concurrent": {
+    "schedule": "concurrent",
+    "firstPlanningRevision": 1,
+    "candidateAction": "targeted_canary_probe",
+    "targetCause": "payment-validation-deadlock",
+    "peerEvidenceDuringPlanning": true,
+    "boundaryRevision": 3,
+    "proposalFresh": false,
+    "policyDecision": "blocked",
+    "policyReason": "stale-plan",
+    "boundedActionCrossed": false,
+    "executedAction": "request_corroboration",
+    "mozaikInterceptionObserved": true,
+    "proposalRewritten": true,
+    "safeToolExecuted": true,
+    "finalDecisionRevision": 3,
+    "finalHypotheses": [
+      {
+        "role": "trace",
+        "claim": "Recent deployment introduced a synchronous deadlock in the checkout payment validation flow.",
+        "confidence": 0.85,
+        "rootCause": "payment-validation-deadlock"
+      },
+      {
+        "role": "dependency",
+        "claim": "Dependency health check indicates external payment gateway timeout causing checkout-api-us-east errors.",
+        "confidence": 0.85,
+        "rootCause": "external-gateway-timeout"
+      },
+      {
+        "role": "impact",
+        "claim": "Customer checkout API requests in us-east are failing due to a recent bad deployment in the checkout-api service.",
+        "confidence": 0.85,
+        "rootCause": "bad-deployment"
+      }
+    ],
+    "finalGateDecision": "blocked",
+    "finalGateReason": "conflicting-evidence",
+    "staleEventObserved": true,
+    "freshReplan": {
+      "basedOnRevision": 3,
+      "boundaryRevision": 3,
+      "policyDecision": "blocked",
+      "policyReason": "conflicting-evidence",
+      "executedAction": "request_corroboration"
+    },
+    "rollbackAuthorizedByFinalStrictGate": false,
+    "attempts": [
+      {
+        "attemptId": "attempt-1",
+        "planId": "plan-1",
+        "basedOnRevision": 1,
+        "boundaryRevision": 3,
+        "fresh": false,
+        "proposedAction": "targeted_canary_probe",
+        "actionRisk": "bounded",
+        "gateDecision": "blocked",
+        "gateReason": "conflicting-evidence",
+        "policyDecision": "blocked",
+        "policyReason": "stale-plan",
+        "availableRoles": [
+          "trace",
+          "dependency",
+          "impact"
+        ],
+        "missingRequiredRoles": [],
+        "degradedRoles": [],
+        "perRoleConfidence": {
+          "trace": 0.85,
+          "dependency": 0.85,
+          "impact": 0.85
+        },
+        "contradictions": 2,
+        "targetCause": "payment-validation-deadlock"
+      },
+      {
+        "attemptId": "attempt-2",
+        "planId": "plan-2",
+        "basedOnRevision": 3,
+        "boundaryRevision": 3,
+        "fresh": true,
+        "proposedAction": "targeted_canary_probe",
+        "actionRisk": "bounded",
+        "gateDecision": "blocked",
+        "gateReason": "conflicting-evidence",
+        "policyDecision": "blocked",
+        "policyReason": "conflicting-evidence",
+        "availableRoles": [
+          "trace",
+          "dependency",
+          "impact"
+        ],
+        "missingRequiredRoles": [],
+        "degradedRoles": [],
+        "perRoleConfidence": {
+          "trace": 0.85,
+          "dependency": 0.85,
+          "impact": 0.85
+        },
+        "contradictions": 2,
+        "targetCause": "payment-validation-deadlock"
+      }
+    ]
+  },
+  "sequential": {
+    "schedule": "sequential",
+    "firstPlanningRevision": 1,
+    "candidateAction": "targeted_canary_probe",
+    "targetCause": "payment-validation-deadlock",
+    "peerEvidenceDuringPlanning": false,
+    "boundaryRevision": 1,
+    "proposalFresh": true,
+    "policyDecision": "approved",
+    "policyReason": "fresh-bounded-evidence",
+    "boundedActionCrossed": true,
+    "executedAction": "targeted_canary_probe",
+    "mozaikInterceptionObserved": true,
+    "proposalRewritten": false,
+    "safeToolExecuted": false,
+    "finalDecisionRevision": 3,
+    "finalHypotheses": [
+      {
+        "role": "trace",
+        "claim": "Recent deployment introduced a synchronous deadlock in the checkout payment validation flow.",
+        "confidence": 0.85,
+        "rootCause": "payment-validation-deadlock"
+      },
+      {
+        "role": "dependency",
+        "claim": "Dependency health check indicates external payment gateway timeout causing checkout-api-us-east errors.",
+        "confidence": 0.85,
+        "rootCause": "external-gateway-timeout"
+      },
+      {
+        "role": "impact",
+        "claim": "Customer checkout API requests in us-east are failing due to a recent bad deployment in the checkout-api service.",
+        "confidence": 0.85,
+        "rootCause": "bad-deployment"
+      }
+    ],
+    "finalGateDecision": "blocked",
+    "finalGateReason": "conflicting-evidence",
+    "staleEventObserved": false,
+    "freshReplan": null,
+    "rollbackAuthorizedByFinalStrictGate": false,
+    "attempts": [
+      {
+        "attemptId": "attempt-1",
+        "planId": "plan-1",
+        "basedOnRevision": 1,
+        "boundaryRevision": 1,
+        "fresh": true,
+        "proposedAction": "targeted_canary_probe",
+        "actionRisk": "bounded",
+        "gateDecision": "blocked",
+        "gateReason": "incomplete-required-evidence",
+        "policyDecision": "approved",
+        "policyReason": "fresh-bounded-evidence",
+        "availableRoles": [
+          "trace"
+        ],
+        "missingRequiredRoles": [
+          "dependency",
+          "impact"
+        ],
+        "degradedRoles": [],
+        "perRoleConfidence": {
+          "trace": 0.85,
+          "dependency": null,
+          "impact": null
+        },
+        "contradictions": 0,
+        "targetCause": "payment-validation-deadlock"
+      }
+    ]
+  },
+  "invariants": {
+    "sameEventualEvidence": true,
+    "sameFirstPlanningRevision": true,
+    "sameCandidateAction": true,
+    "concurrentProposalInvalidatedAsStale": true,
+    "concurrentFreshReplanSeesConflict": true,
+    "sequentialProposalCrossedWhileFresh": true,
+    "unauthorizedRollbackCrossings": 0,
+    "staleNonSafeCrossings": 0
+  },
+  "causalFinding": "Concurrent responder progress advanced authoritative evidence while the planner was in flight, so the revision-1 bounded proposal was stale and could not execute. Serialization left that same proposal fresh at its boundary, so the bounded proposal crossed before the same later evidence exposed the wrong causal picture.",
+  "limitation": "The provider-generated hypotheses are frozen from one authenticated historical receipt. This deterministic Mozaik replay changes scheduling, not live provider timing. The canary is a bounded proposal-only fixture and performs no production mutation; configured fixture timing is not a production-latency claim."
+}

@@ -1,8 +1,9 @@
 {
-  "schema": "incidentmesh.semantic-stability/v1",
+  "schema": "incidentmesh.semantic-stability/v2",
   "repetitionsPerArm": 25,
-  "runs": 50,
+  "runs": 100,
   "semanticMismatches": [],
+  "stalePlanMismatches": [],
   "concurrent": {
     "expected": {
       "gateAtBoundary": "blocked",
@@ -15,10 +16,6 @@
       "finalGate": "blocked",
       "finalReason": "conflicting-evidence",
       "timedOut": false
-    },
-    "elapsedMs": {
-      "min": 282,
-      "max": 286
     }
   },
   "sequential": {
@@ -33,11 +30,37 @@
       "finalGate": "blocked",
       "finalReason": "conflicting-evidence",
       "timedOut": false
-    },
-    "elapsedMs": {
-      "min": 542,
-      "max": 545
     }
   },
-  "finding": "Observed timer jitter may shift elapsed milliseconds, but the canonical concurrent and sequential semantic projections remained stable across every repeated run."
+  "stalePlan": {
+    "expected": {
+      "concurrent": {
+        "planningRevision": 1,
+        "boundaryRevision": 3,
+        "fresh": false,
+        "crossed": false,
+        "policyReason": "stale-plan",
+        "rewritten": true
+      },
+      "sequential": {
+        "planningRevision": 1,
+        "boundaryRevision": 1,
+        "fresh": true,
+        "crossed": true,
+        "policyReason": "fresh-bounded-evidence",
+        "rewritten": false
+      },
+      "invariants": {
+        "sameEventualEvidence": true,
+        "sameFirstPlanningRevision": true,
+        "sameCandidateAction": true,
+        "concurrentProposalInvalidatedAsStale": true,
+        "concurrentFreshReplanSeesConflict": true,
+        "sequentialProposalCrossedWhileFresh": true,
+        "unauthorizedRollbackCrossings": 0,
+        "staleNonSafeCrossings": 0
+      }
+    }
+  },
+  "finding": "Host timer jitter is intentionally excluded from the receipt; the fixed-boundary and revision-stamped stale-plan semantic projections remained stable across every repeated run."
 }

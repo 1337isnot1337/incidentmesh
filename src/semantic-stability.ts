@@ -75,18 +75,16 @@ const expectedStaleProjection = staleProjection(staleRuns[0])
 const stalePlanMismatches = staleRuns
   .map((item, index) => JSON.stringify(staleProjection(item)) === JSON.stringify(expectedStaleProjection) ? null : { index })
   .filter((item): item is { index: number } => item !== null)
-const elapsed = (scheduleMode: ScheduleMode) => results[scheduleMode].map((report) => report.elapsedMs)
-const range = (values: number[]) => ({ min: Math.min(...values), max: Math.max(...values) })
 const report = {
-  schema: "incidentmesh.semantic-stability/v1",
+  schema: "incidentmesh.semantic-stability/v2",
   repetitionsPerArm: repetitions,
   runs: repetitions * 4,
   semanticMismatches,
   stalePlanMismatches,
-  concurrent: { expected: expected.concurrent, elapsedMs: range(elapsed("concurrent")) },
-  sequential: { expected: expected.sequential, elapsedMs: range(elapsed("sequential")) },
+  concurrent: { expected: expected.concurrent },
+  sequential: { expected: expected.sequential },
   stalePlan: { expected: expectedStaleProjection },
-  finding: "Observed timer jitter may shift elapsed milliseconds, but the fixed-boundary and revision-stamped stale-plan semantic projections remained stable across every repeated run.",
+  finding: "Host timer jitter is intentionally excluded from the receipt; the fixed-boundary and revision-stamped stale-plan semantic projections remained stable across every repeated run.",
 }
 
 const outputJson = resolve("docs/evidence/semantic-stability.json")
@@ -96,10 +94,8 @@ const markdown = `# IncidentMesh semantic-stability receipt\n\n` +
   `- Repetitions per arm: ${repetitions}\n` +
   `- Total runs: ${report.runs}\n` +
   `- Semantic mismatches: **${semanticMismatches.length}**\n` +
-  `- Stale-plan semantic mismatches: **${stalePlanMismatches.length}**\n` +
-  `- Concurrent elapsed range: ${report.concurrent.elapsedMs.min}–${report.concurrent.elapsedMs.max} ms\n` +
-  `- Sequential elapsed range: ${report.sequential.elapsedMs.min}–${report.sequential.elapsedMs.max} ms\n\n` +
-  `The expected projections include boundary gate reason, evidence available, safe action, interception, executed tool, final gate, and stale-plan freshness/crossing outcomes. Millisecond ranges are observational only; no MTTR or production-speed claim is made.\n`
+  `- Stale-plan semantic mismatches: **${stalePlanMismatches.length}**\n\n` +
+  `The expected projections include boundary gate reason, evidence available, safe action, interception, executed tool, final gate, and stale-plan freshness/crossing outcomes. Wall-clock values are intentionally excluded because this receipt proves repeatable semantics, not production latency or MTTR.\n`
 await mkdir(dirname(outputJson), { recursive: true })
 await writeFile(outputJson, `${JSON.stringify(report, null, 2)}\n`, "utf8")
 await writeFile(outputMd, markdown, "utf8")

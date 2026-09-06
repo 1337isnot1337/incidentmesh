@@ -12,6 +12,13 @@ export const ACTION_EXECUTION_REQUESTED = "incident.action.execution-requested";
 export const SAFE_ACTION_EXECUTED = "incident.action.safe-executed";
 export const RESPONDER_DEGRADED = "incident.responder.degraded";
 export const MITIGATION_PHASE_STARTED = "incident.mitigation.phase-started";
+export const DECISION_REVISION_ADVANCED = "incident.decision.revision-advanced";
+export const PLAN_STARTED = "incident.plan.started";
+export const PLAN_PROPOSED = "incident.plan.proposed";
+export const PLAN_STALE = "incident.plan.stale";
+export const PLAN_REPLAN_REQUESTED = "incident.plan.replan-requested";
+export const PLAN_REPLANNED = "incident.plan.replanned";
+export const ACTION_ATTEMPT_SNAPSHOTTED = "incident.action.attempt-snapshotted";
 export const ROLES = ["trace", "dependency", "impact"];
 export class IncidentState extends RuntimeState {
     incident = "checkout-api-us-east";
@@ -32,6 +39,12 @@ export class IncidentState extends RuntimeState {
     responderIds = new Map();
     safetyGateId = null;
     actionControllerId = null;
+    planSequence = 0;
+    attemptSequence = 0;
+    activePlanId = null;
+    planContexts = [];
+    attemptSnapshots = [];
+    decisionRevision = 0;
     actionProposed = false;
     actionAttemptStarted = false;
     actionBoundaryMs = 205;
@@ -48,6 +61,8 @@ export class IncidentState extends RuntimeState {
     actionIntercepted = false;
     actionExecutedTool = null;
     mitigationPhaseStarted = false;
+    staleReplanRequired = false;
+    freshReplanStarted = false;
     modelMitigationRecommendation = null;
     onTrace;
     changeListeners = new Set();
@@ -73,10 +88,20 @@ export class IncidentState extends RuntimeState {
     isActionControllerProducer(participantId) {
         return this.actionControllerId === participantId;
     }
-    markDegraded(role) {
+    advanceDecisionRevision(cause, producerId) {
+        const previous = this.decisionRevision;
+        this.decisionRevision += 1;
+        this.record(DECISION_REVISION_ADVANCED, producerId, `decision revision ${previous} -> ${this.decisionRevision}: ${cause}`);
+    }
+    markDegraded(role, producerId = this.responderIds.get(role) ?? "Safety Gate") {
+        const registeredResponder = this.responderIds.get(role);
+        const internallyAuthorized = producerId === registeredResponder || producerId === this.safetyGateId || producerId === "Safety Gate";
+        if (!internallyAuthorized)
+            return false;
         if (this.degradedRoles.includes(role))
             return false;
         this.degradedRoles.push(role);
+        this.advanceDecisionRevision(`${role} closed/degraded`, producerId);
         this.notifyChange();
         return true;
     }
@@ -119,44 +144,156 @@ export class IncidentState extends RuntimeState {
             atMs: Math.round(performance.now() - this.startedAt),
         });
         this.recalculateAggregate();
+        this.advanceDecisionRevision(`${role} hypothesis accepted`, producerId);
         this.notifyChange();
         return { status: this.actionBoundarySnapshot === null ? "accepted" : "late-accepted", role };
     }
-    captureActionBoundarySnapshot(proposedAction) {
-        if (this.actionBoundarySnapshot !== null)
-            return this.actionBoundarySnapshot;
+    startPlan(producerId, planId = `plan-${++this.planSequence}`) {
+        if (!this.isActionControllerProducer(producerId)) {
+            this.record(PLAN_STARTED, producerId, `rejected plan ${planId}: invalid Action Controller provenance`);
+            return null;
+        }
+        if (this.planContexts.some((plan) => plan.planId === planId))
+            return null;
+        const hypotheses = this.hypotheses.map((item) => Object.freeze({
+            role: item.role,
+            claim: item.claim,
+            confidence: item.confidence,
+            rootCause: item.rootCause,
+        }));
+        const plan = Object.freeze({
+            planId,
+            producerId,
+            basedOnRevision: this.decisionRevision,
+            availableRoles: Object.freeze(hypotheses.map((item) => item.role)),
+            hypotheses: Object.freeze(hypotheses),
+            startedAtMs: Math.round(performance.now() - this.startedAt),
+        });
+        this.planContexts.push(plan);
+        this.activePlanId = plan.planId;
+        this.record(PLAN_STARTED, producerId, `${plan.planId} started at revision ${plan.basedOnRevision} with roles=${plan.availableRoles.join(",") || "none"}`);
+        return plan;
+    }
+    getPlan(planId) {
+        return this.planContexts.find((plan) => plan.planId === planId) ?? null;
+    }
+    get actionAttempts() {
+        return this.attemptSnapshots;
+    }
+    getActivePlan() {
+        return this.activePlanId === null ? null : this.getPlan(this.activePlanId);
+    }
+    riskFor(action) {
+        return action === "rollback_production" ? "destructive"
+            : action === "targeted_canary_probe" ? "bounded"
+                : "safe";
+    }
+    captureActionAttempt(input) {
+        const attemptId = `attempt-${++this.attemptSequence}`;
+        const plan = input.planId === undefined || input.planId === null ? this.getActivePlan() : this.getPlan(input.planId);
+        const validProvenance = plan !== null
+            && plan.producerId === input.producerId
+            && this.isActionControllerProducer(input.producerId);
+        const basedOnRevision = plan?.basedOnRevision ?? -1;
+        const boundaryRevision = this.decisionRevision;
+        const fresh = validProvenance && basedOnRevision === boundaryRevision;
         const evaluation = evaluateSafetyGate(this.hypotheses, this.degradedRoles, "action-boundary");
+        const actionRisk = this.riskFor(input.proposedAction);
+        const targetCause = typeof input.targetCause === "string" && input.targetCause.trim().length > 0
+            ? input.targetCause.trim()
+            : null;
+        const visibleCauses = new Set(this.hypotheses.map((item) => item.rootCause));
+        const availableStrong = this.hypotheses.length > 0
+            && this.hypotheses.every((item) => Number.isFinite(item.confidence) && item.confidence >= 0.8);
+        let policyDecision = "blocked";
+        let policyReason;
+        if (actionRisk === "safe") {
+            policyDecision = "approved";
+            policyReason = "safe-action";
+        }
+        else if (!validProvenance) {
+            policyReason = "invalid-plan-provenance";
+        }
+        else if (!fresh) {
+            policyReason = "stale-plan";
+        }
+        else if (actionRisk === "bounded") {
+            if (this.degradedRoles.length > 0)
+                policyReason = "degraded-evidence";
+            else if (!availableStrong)
+                policyReason = "insufficient-bounded-evidence";
+            else if (evaluation.contradictions > 0)
+                policyReason = "conflicting-evidence";
+            else if (targetCause === null || visibleCauses.size !== 1 || !visibleCauses.has(targetCause)) {
+                policyReason = "bounded-target-mismatch";
+            }
+            else {
+                policyDecision = "approved";
+                policyReason = "fresh-bounded-evidence";
+            }
+        }
+        else if (evaluation.decision === "approved") {
+            policyDecision = "approved";
+            policyReason = evaluation.reason;
+        }
+        else {
+            policyReason = evaluation.reason;
+        }
+        const perRoleConfidence = Object.freeze(Object.fromEntries(ROLES.map((role) => [
+            role,
+            this.hypotheses.find((item) => item.role === role)?.confidence ?? null,
+        ])));
         const snapshot = Object.freeze({
+            attemptId,
+            planId: plan?.planId ?? "invalid-plan",
+            actionProducerId: input.producerId,
+            basedOnRevision,
+            boundaryRevision,
+            fresh,
             atMs: Math.round(performance.now() - this.startedAt),
             investigationDecision: this.gateDecision,
             investigationReason: this.gateReason,
-            decision: evaluation.decision,
-            reason: evaluation.reason,
+            gateDecision: evaluation.decision,
+            gateReason: evaluation.reason,
+            policyDecision,
+            policyReason,
+            decision: policyDecision,
+            reason: policyReason,
             availableRoles: Object.freeze([...evaluation.availableRoles]),
             missingRequiredRoles: Object.freeze([...evaluation.missingRequiredRoles]),
             degradedRoles: Object.freeze([...this.degradedRoles]),
             confidence: Number(evaluation.confidence.toFixed(2)),
+            perRoleConfidence,
             contradictions: evaluation.contradictions,
-            proposedAction,
+            proposedAction: input.proposedAction,
+            actionRisk,
+            targetCause,
         });
+        this.attemptSnapshots.push(snapshot);
         this.actionBoundarySnapshot = snapshot;
-        this.gateAtActionBoundary = snapshot.decision;
-        this.gateReasonAtActionBoundary = snapshot.reason;
+        this.gateAtActionBoundary = snapshot.gateDecision;
+        this.gateReasonAtActionBoundary = snapshot.gateReason;
         this.hypothesesAtActionBoundary = snapshot.availableRoles.length;
         this.contradictionsAtActionBoundary = snapshot.contradictions;
-        this.boundarySafeAction = snapshot.decision === "approved"
+        this.boundarySafeAction = snapshot.proposedAction === "rollback_production" && snapshot.policyDecision === "approved"
             ? "rollback-approved"
-            : snapshot.reason === "conflicting-evidence"
+            : snapshot.gateReason === "conflicting-evidence"
                 ? "canary-with-targeted-corroboration"
-                : snapshot.reason === "incomplete-required-evidence"
+                : snapshot.gateReason === "incomplete-required-evidence"
                     ? "hold-for-missing-evidence"
                     : "request-broader-corroboration";
         if (this.boundarySafeAction === "canary-with-targeted-corroboration") {
             this.actionableSafePlan = "canary-with-targeted-corroboration";
             this.actionableSafePlanAtMs = snapshot.atMs;
         }
+        this.record(ACTION_ATTEMPT_SNAPSHOTTED, input.producerId, `${snapshot.attemptId} ${snapshot.proposedAction} plan=${snapshot.planId} revision=${snapshot.basedOnRevision}->${snapshot.boundaryRevision} ${snapshot.fresh ? "fresh" : "stale"} policy=${snapshot.policyDecision}:${snapshot.policyReason}`);
         this.notifyChange();
         return snapshot;
+    }
+    captureActionBoundarySnapshot(proposedAction) {
+        const producerId = this.actionControllerId ?? "unregistered-action-controller";
+        const plan = this.getActivePlan() ?? this.startPlan(producerId);
+        return this.captureActionAttempt({ proposedAction, producerId, planId: plan?.planId });
     }
     markActionableCanaryAvailable() {
         if (this.actionableSafePlanAtMs !== null)
@@ -222,7 +359,21 @@ export class IncidentState extends RuntimeState {
                     availableRoles: [...this.actionBoundarySnapshot.availableRoles],
                     missingRequiredRoles: [...this.actionBoundarySnapshot.missingRequiredRoles],
                     degradedRoles: [...this.actionBoundarySnapshot.degradedRoles],
+                    perRoleConfidence: { ...this.actionBoundarySnapshot.perRoleConfidence },
                 },
+                plans: this.planContexts.map((plan) => ({
+                    ...plan,
+                    availableRoles: [...plan.availableRoles],
+                    hypotheses: plan.hypotheses.map((hypothesis) => ({ ...hypothesis })),
+                })),
+                attempts: this.attemptSnapshots.map((attempt) => ({
+                    ...attempt,
+                    availableRoles: [...attempt.availableRoles],
+                    missingRequiredRoles: [...attempt.missingRequiredRoles],
+                    degradedRoles: [...attempt.degradedRoles],
+                    perRoleConfidence: { ...attempt.perRoleConfidence },
+                })),
+                decisionRevision: this.decisionRevision,
                 boundarySafeAction: this.boundarySafeAction,
                 actionableSafePlan: this.actionableSafePlan,
                 actionableSafePlanAtMs: this.actionableSafePlanAtMs,
@@ -325,16 +476,45 @@ export function createRequestCorroborationTool(onInvoke) {
     };
 }
 export const requestCorroborationTool = createRequestCorroborationTool();
+export function createTargetedCanaryProbeTool(onInvoke) {
+    return {
+        type: "function",
+        name: "targeted_canary_probe",
+        description: "Record a bounded, reversible, proposal-only diagnostic canary probe for one evidenced cause.",
+        parameters: {
+            type: "object",
+            properties: {
+                service: { type: "string" },
+                targetCause: { type: "string" },
+                scope: { type: "string" },
+            },
+            required: ["service", "targetCause", "scope"],
+            additionalProperties: false,
+        },
+        strict: true,
+        invoke: async (args) => {
+            onInvoke?.(args);
+            return {
+                status: "proposal-only-bounded-probe",
+                service: args.service,
+                targetCause: args.targetCause,
+                scope: args.scope,
+            };
+        },
+    };
+}
 export class SafetyGateInterception {
     state;
-    constructor(state) {
+    context;
+    constructor(state, context = {}) {
         this.state = state;
+        this.context = context;
     }
     isSatisfiedBy(transition) {
-        // Every rollback proposal must cross this handler. Authorization is derived
-        // only from the immutable action-boundary snapshot, never the mutable live gate.
+        // Every non-safe proposal must cross this handler. Authorization is derived
+        // only from its own immutable attempt snapshot, never the mutable live gate.
         return transition.nextStateId === "function_call"
-            && transition.input.call.name === "rollback_production";
+            && (transition.input.call.name === "rollback_production" || transition.input.call.name === "targeted_canary_probe");
     }
     async handle(transition) {
         if (!this.isSatisfiedBy(transition) || transition.nextStateId !== "function_call") {
@@ -342,11 +522,40 @@ export class SafetyGateInterception {
         }
         const functionCallTransition = transition;
         const call = functionCallTransition.input.call;
-        const snapshot = this.state.captureActionBoundarySnapshot("rollback_production");
-        if (snapshot.decision === "approved")
+        const proposedAction = call.name;
+        let targetCause = null;
+        if (proposedAction === "targeted_canary_probe") {
+            try {
+                const args = JSON.parse(call.args);
+                if (typeof args.targetCause === "string")
+                    targetCause = args.targetCause;
+            }
+            catch {
+                // A malformed target is deterministically rejected by bounded policy.
+            }
+        }
+        const activePlan = this.context.planId === undefined ? this.state.getActivePlan() : this.state.getPlan(this.context.planId);
+        const producerId = this.context.producerId ?? activePlan?.producerId ?? "unregistered-action-controller";
+        const snapshot = this.state.captureActionAttempt({
+            proposedAction,
+            producerId,
+            planId: this.context.planId ?? activePlan?.planId,
+            targetCause,
+        });
+        this.state.actionProposed = true;
+        this.state.requestedActionTool = proposedAction;
+        this.state.actionAttemptStarted = true;
+        this.state.actionAttemptedAtMs ??= snapshot.atMs;
+        this.state.record(PLAN_PROPOSED, producerId, `${snapshot.planId} proposed ${proposedAction} based on revision ${snapshot.basedOnRevision}`);
+        if (snapshot.policyDecision === "approved")
             return transition;
         this.state.actionIntercepted = true;
-        const reason = snapshot.reason;
+        const reason = snapshot.policyReason;
+        if (!snapshot.fresh && snapshot.actionRisk !== "safe") {
+            this.state.staleReplanRequired = true;
+            this.state.record(PLAN_STALE, producerId, `${snapshot.planId} invalidated: based on revision ${snapshot.basedOnRevision}, boundary revision ${snapshot.boundaryRevision}`);
+            this.state.record(PLAN_REPLAN_REQUESTED, producerId, `${snapshot.planId} routed to request_corroboration before fresh replanning`);
+        }
         this.state.record("mozaik.interception.rewritten", "Safety Gate", `rewrote ${call.name} -> request_corroboration (${reason})`);
         const safeCall = FunctionCallItem.rehydrate({
             callId: call.callId,
@@ -416,9 +625,32 @@ function responderStartOffset(role, scheduleMode) {
     return traceDuration + ROLE_CONFIG.dependency.delay + RESPONDER_TAIL_MS;
 }
 class DeterministicActionInferenceRunner {
+    speculativePlanningMs;
+    constructor(speculativePlanningMs = 0) {
+        this.speculativePlanningMs = speculativePlanningMs;
+    }
     async run(request) {
         const hasToolOutput = request.context.getItems().some((item) => item.type === "function_call_output");
         if (!hasToolOutput) {
+            const contextText = JSON.stringify(request.context.getItems());
+            if (contextText.includes("revision-stamped speculative plan")) {
+                if (this.speculativePlanningMs > 0)
+                    await sleep(this.speculativePlanningMs);
+                const match = /targetCause=([a-z0-9-]+)/.exec(contextText);
+                return {
+                    items: [FunctionCallItem.rehydrate({
+                            callId: "incidentmesh-deterministic-bounded-probe",
+                            name: "targeted_canary_probe",
+                            args: JSON.stringify({
+                                service: "checkout-api",
+                                targetCause: match?.[1] ?? "unknown-cause",
+                                scope: "five-percent-diagnostic-canary",
+                            }),
+                        })],
+                    tokenUsage: undefined,
+                    rowResponse: { fixture: "revision_stamped_bounded_proposal" },
+                };
+            }
             return {
                 items: [FunctionCallItem.rehydrate({
                         callId: "incidentmesh-deterministic-rollback",
@@ -586,25 +818,26 @@ function responderHandlers(role, state, dryRun, scheduleMode, simulateDependency
     };
     return [opened, peerAwareness, modelAnswer, blockedAdaptation, canaryEvidence];
 }
-function mitigationPrompt(state) {
-    const evidence = state.hypotheses
+function mitigationPrompt(state, plan) {
+    const evidence = plan.hypotheses
         .map((item) => `- ${item.role}: confidence=${item.confidence.toFixed(2)} rootCause=${item.rootCause} claim=${item.claim}`)
         .join("\n");
     return [
         "You are the mitigation owner in IncidentMesh. Phase-1 evidence collection is closed for this action phase.",
         `Incident: ${state.incident}.`,
+        `Planning context: ${plan.planId}, decision revision ${plan.basedOnRevision}.`,
         `Safety Gate: ${state.gateDecision} (${state.gateReason}); aggregate confidence=${state.confidence.toFixed(2)}; contradictions=${state.contradictions}.`,
         "Shared evidence from independent responders:",
         evidence,
         "Choose the next mitigation using this shared evidence. If you choose a production rollback, call rollback_production; the Safety Gate will inspect that tool transition. If corroboration is required, account for the tool result and then give a concise final recommendation. Do not claim that Phase-1 responder models saw one another's evidence.",
     ].join("\n");
 }
-function actionHandlers(state, dryRun, phase1Only, actionProposalMs, actionBoundaryMs, model, maxOutputTokens, reasoningEffort, runLoop, sendEvent) {
+function actionHandlers(state, dryRun, phase1Only, planningMode, actionProposalMs, actionBoundaryMs, model, maxOutputTokens, reasoningEffort, runLoop, sendEvent) {
     const deterministicBoundary = {
         specification: isType(INCIDENT_OPENED),
         processor: {
             apply({ participant }) {
-                if (!dryRun || state.actionProposed)
+                if (!dryRun || planningMode !== "post-aggregation" || state.actionProposed)
                     return;
                 if (!(participant instanceof Agent))
                     return;
@@ -621,24 +854,68 @@ function actionHandlers(state, dryRun, phase1Only, actionProposalMs, actionBound
                     await sleep(actionBoundaryMs - actionProposalMs);
                     if (state.actionAttemptStarted)
                         return;
+                    const plan = state.startPlan(participant.getId());
+                    if (plan === null) {
+                        state.record("incident.plan.error", participant.getId(), "Action Controller could not establish an authoritative plan context");
+                        return;
+                    }
                     state.actionAttemptStarted = true;
                     state.actionAttemptedAtMs = Math.round(performance.now() - state.startedAt);
                     sendEvent(event(ACTION_EXECUTION_REQUESTED, participant.getId(), {
                         action: "rollback_production",
+                        planId: plan.planId,
+                        basedOnRevision: plan.basedOnRevision,
                         hypotheses: state.hypotheses.length,
                         contradictions: state.contradictions,
                         detail: `action boundary reached with hypotheses=${state.hypotheses.length}, contradictions=${state.contradictions}`,
                     }), participant.getId());
-                    const boundaryCaptured = await state.waitFor(() => state.actionBoundarySnapshot !== null, 50);
-                    if (!boundaryCaptured) {
-                        state.record("incident.action.boundary-error", "Action Controller", "Safety Gate did not capture the action-boundary snapshot");
-                        return;
-                    }
                     runLoop(participant.getId(), "Execute the pending rollback proposal at the fixed action boundary.", {
                         model: "incidentmesh-deterministic-action",
                         tools: participant.getTools(),
                         context: participant.getMemory().getContext(),
-                    }, new SafetyGateInterception(state));
+                    }, new SafetyGateInterception(state, { producerId: participant.getId(), planId: plan.planId }));
+                })();
+            },
+        },
+    };
+    const speculativeBoundedPlanning = {
+        specification: isPeerType(HYPOTHESIS_EMITTED),
+        processor: {
+            apply({ participant, event: hypothesisEvent }) {
+                if (!dryRun || planningMode !== "speculative-bounded" || state.mitigationPhaseStarted || !(participant instanceof Agent))
+                    return;
+                const payload = hypothesisEvent.payload;
+                if (payload.role !== "trace")
+                    return;
+                void (async () => {
+                    const accepted = await state.waitFor(() => state.hypotheses.some((item) => item.role === "trace"), 50);
+                    if (!accepted || state.mitigationPhaseStarted)
+                        return;
+                    const traceHypothesis = state.hypotheses.find((item) => item.role === "trace");
+                    if (traceHypothesis === undefined)
+                        return;
+                    const plan = state.startPlan(participant.getId());
+                    if (plan === null)
+                        return;
+                    state.mitigationPhaseStarted = true;
+                    state.actionBoundaryMs = null;
+                    sendEvent(event(MITIGATION_PHASE_STARTED, participant.getId(), {
+                        planId: plan.planId,
+                        basedOnRevision: plan.basedOnRevision,
+                        planningMode,
+                        detail: `speculative bounded planning started at revision ${plan.basedOnRevision} while peer investigations continue`,
+                    }), participant.getId());
+                    runLoop(participant.getId(), [
+                        "Execute the revision-stamped speculative plan.",
+                        `planId=${plan.planId}`,
+                        `basedOnRevision=${plan.basedOnRevision}`,
+                        `targetCause=${traceHypothesis.rootCause}`,
+                        "Propose only the bounded targeted_canary_probe; the action boundary will enforce revision freshness and policy.",
+                    ].join(" "), {
+                        model: "incidentmesh-deterministic-action",
+                        tools: participant.getTools(),
+                        context: participant.getMemory().getContext(),
+                    }, new SafetyGateInterception(state, { producerId: participant.getId(), planId: plan.planId }));
                 })();
             },
         },
@@ -656,18 +933,59 @@ function actionHandlers(state, dryRun, phase1Only, actionProposalMs, actionBound
                     return;
                 state.mitigationPhaseStarted = true;
                 state.actionBoundaryMs = null;
+                const plan = state.startPlan(participant.getId());
+                if (plan === null) {
+                    state.record("incident.plan.error", participant.getId(), "Provider Action Controller could not establish an authoritative plan context");
+                    return;
+                }
                 sendEvent(event(MITIGATION_PHASE_STARTED, participant.getId(), {
+                    planId: plan.planId,
+                    basedOnRevision: plan.basedOnRevision,
                     gateDecision: state.gateDecision,
                     hypotheses: state.hypotheses.length,
                     detail: `Phase 2 mitigation loop started with ${state.hypotheses.length} shared hypotheses and gate=${state.gateDecision}`,
                 }), participant.getId());
-                runLoop(participant.getId(), mitigationPrompt(state), {
+                runLoop(participant.getId(), mitigationPrompt(state, plan), {
                     model,
                     maxOutputTokens,
                     ...(reasoningEffort === undefined ? {} : { reasoningEffort }),
                     tools: participant.getTools(),
                     context: participant.getMemory().getContext(),
-                }, new SafetyGateInterception(state));
+                }, new SafetyGateInterception(state, { producerId: participant.getId(), planId: plan.planId }));
+            },
+        },
+    };
+    const stalePlanReplanning = {
+        specification: isType(SAFE_ACTION_EXECUTED),
+        processor: {
+            apply({ participant }) {
+                if (!dryRun || planningMode !== "speculative-bounded" || !state.staleReplanRequired
+                    || state.freshReplanStarted || !(participant instanceof Agent))
+                    return;
+                const staleAttempt = state.actionAttempts.find((attempt) => attempt.policyReason === "stale-plan");
+                if (staleAttempt === undefined || staleAttempt.targetCause === null)
+                    return;
+                const plan = state.startPlan(participant.getId());
+                if (plan === null)
+                    return;
+                state.freshReplanStarted = true;
+                sendEvent(event(PLAN_REPLANNED, participant.getId(), {
+                    previousPlanId: staleAttempt.planId,
+                    planId: plan.planId,
+                    basedOnRevision: plan.basedOnRevision,
+                    detail: `fresh replan ${plan.planId} started at revision ${plan.basedOnRevision} after ${staleAttempt.planId} was invalidated`,
+                }), participant.getId());
+                runLoop(participant.getId(), [
+                    "Execute the revision-stamped speculative plan as a fresh replan.",
+                    `planId=${plan.planId}`,
+                    `basedOnRevision=${plan.basedOnRevision}`,
+                    `targetCause=${staleAttempt.targetCause}`,
+                    "Re-evaluate the same bounded targeted_canary_probe under current authoritative evidence.",
+                ].join(" "), {
+                    model: "incidentmesh-deterministic-action",
+                    tools: participant.getTools(),
+                    context: participant.getMemory().getContext(),
+                }, new SafetyGateInterception(state, { producerId: participant.getId(), planId: plan.planId }));
             },
         },
     };
@@ -692,7 +1010,7 @@ function actionHandlers(state, dryRun, phase1Only, actionProposalMs, actionBound
             },
         },
     };
-    return [deterministicBoundary, providerMitigationPhase, providerRecommendation];
+    return [deterministicBoundary, speculativeBoundedPlanning, stalePlanReplanning, providerMitigationPhase, providerRecommendation];
 }
 export function evaluateSafetyGate(hypotheses, degradedRoles = [], scope = "investigation") {
     const byRole = new Map();
@@ -716,6 +1034,9 @@ export function evaluateSafetyGate(hypotheses, degradedRoles = [], scope = "inve
             return { decision: "blocked", reason: "incomplete-required-evidence", confidence, contradictions, availableRoles, missingRequiredRoles };
         }
         return { decision: "pending", reason: "pending-required-evidence", confidence, contradictions, availableRoles, missingRequiredRoles };
+    }
+    if (degradedRoles.length > 0) {
+        return { decision: "blocked", reason: "degraded-required-responder", confidence, contradictions, availableRoles, missingRequiredRoles };
     }
     if (contradictions > 0) {
         return { decision: "blocked", reason: "conflicting-evidence", confidence, contradictions, availableRoles, missingRequiredRoles };
@@ -750,17 +1071,17 @@ function emitInvestigationGateDecision(state, participantId, sendEvent, trigger)
     }), participantId);
 }
 function emitActionBoundaryDecision(state, participantId, sendEvent) {
-    const snapshot = state.captureActionBoundarySnapshot("rollback_production");
+    const evaluation = evaluateSafetyGate(state.hypotheses, state.degradedRoles, "action-boundary");
     sendEvent(event(GATE_DECISION, participantId, {
         scope: "action-boundary",
-        decision: snapshot.decision,
-        gateReason: snapshot.reason,
-        confidence: snapshot.confidence,
-        contradictions: snapshot.contradictions,
-        hypotheses: snapshot.availableRoles.length,
-        missingRequiredRoles: snapshot.missingRequiredRoles,
-        investigationDecision: snapshot.investigationDecision,
-        detail: `${snapshot.decision}: ${snapshot.reason}; boundary hypotheses=${snapshot.availableRoles.length}, missing=${snapshot.missingRequiredRoles.join(",") || "none"}`,
+        decision: evaluation.decision,
+        gateReason: evaluation.reason,
+        confidence: evaluation.confidence,
+        contradictions: evaluation.contradictions,
+        hypotheses: evaluation.availableRoles.length,
+        missingRequiredRoles: evaluation.missingRequiredRoles,
+        investigationDecision: state.gateDecision,
+        detail: `${evaluation.decision}: ${evaluation.reason}; boundary hypotheses=${evaluation.availableRoles.length}, missing=${evaluation.missingRequiredRoles.join(",") || "none"}`,
     }), participantId);
 }
 function gateHandlers(state, sendEvent) {
@@ -837,15 +1158,13 @@ function frameworkObserverHandlers(state) {
                     if (frameworkEvent.type === "interception.started") {
                         const input = payload.input;
                         const callName = input?.call?.name;
-                        if (callName === "rollback_production") {
+                        if (callName === "rollback_production" || callName === "targeted_canary_probe") {
                             state.actionProposed = true;
-                            state.requestedActionTool = "rollback_production";
+                            state.requestedActionTool = callName;
                             if (!state.actionAttemptStarted) {
                                 state.actionAttemptStarted = true;
                                 state.actionAttemptedAtMs = Math.round(performance.now() - state.startedAt);
                             }
-                            if (state.actionBoundarySnapshot === null)
-                                state.captureActionBoundarySnapshot("rollback_production");
                         }
                         state.record("mozaik.interception.started", frameworkEvent.producerId, `InterceptionHandler received ${callName ?? "function call"}`);
                         return;
@@ -857,15 +1176,13 @@ function frameworkObserverHandlers(state) {
                     }
                     if (frameworkEvent.type === "function_call.started") {
                         const call = payload.call;
-                        if (call?.name === "rollback_production") {
+                        if (call?.name === "rollback_production" || call?.name === "targeted_canary_probe") {
                             state.actionProposed = true;
-                            state.requestedActionTool = "rollback_production";
+                            state.requestedActionTool = call.name;
                             if (!state.actionAttemptStarted) {
                                 state.actionAttemptStarted = true;
                                 state.actionAttemptedAtMs = Math.round(performance.now() - state.startedAt);
                             }
-                            if (state.actionBoundarySnapshot === null)
-                                state.captureActionBoundarySnapshot("rollback_production");
                         }
                         state.record("mozaik.function-call.started", frameworkEvent.producerId, `Mozaik executing ${call?.name ?? "tool"}`);
                         return;
@@ -914,6 +1231,8 @@ export async function runIncidentScenario(options = {}) {
     const maxOutputTokens = options.maxOutputTokens ?? 350;
     const reasoningEffort = options.reasoningEffort;
     const scheduleMode = options.scheduleMode ?? "concurrent";
+    const planningMode = options.planningMode ?? "post-aggregation";
+    const speculativePlanningMs = options.speculativePlanningMs ?? 120;
     const actionProposalMs = options.actionProposalMs ?? 45;
     const actionBoundaryMs = options.actionBoundaryMs ?? 205;
     const simulateDependencyTimeout = options.simulateDependencyTimeout ?? false;
@@ -925,7 +1244,7 @@ export async function runIncidentScenario(options = {}) {
     state.scheduleMode = scheduleMode;
     state.actionBoundaryMs = actionBoundaryMs;
     state.onTrace = options.trace;
-    const inferenceRunner = options.inferenceRunner ?? (dryRun ? new DeterministicActionInferenceRunner() : undefined);
+    const inferenceRunner = options.inferenceRunner ?? (dryRun ? new DeterministicActionInferenceRunner(planningMode === "speculative-bounded" ? speculativePlanningMs : 0) : undefined);
     const runtimeModels = model === "gemini-3.5-flash-lite"
         ? (() => {
             const base = supportedModels.find((candidate) => candidate.specification.name === "gemini-3.5-flash");
@@ -972,13 +1291,22 @@ export async function runIncidentScenario(options = {}) {
                 detail: `safe tool executed for blocked ${args.originalAction}`,
             }), actionController.getId());
         }),
+        createTargetedCanaryProbeTool((args) => {
+            state.actionExecutedTool = "targeted_canary_probe";
+            sendEvent(event("incident.action.bounded-probe-executed", actionController.getId(), {
+                action: "targeted_canary_probe",
+                targetCause: args.targetCause,
+                scope: args.scope,
+                detail: `proposal-only bounded canary probe recorded for ${args.targetCause}`,
+            }), actionController.getId());
+        }),
     ];
     actionController = createAgent({
         name: "Action Controller",
         capabilities: ["production-change", "action-boundary"],
         instruction: "Execute proposed incident mitigations only through the Safety Gate.",
         tools: actionTools,
-        handlers: actionHandlers(state, dryRun, phase1Only, actionProposalMs, actionBoundaryMs, model, maxOutputTokens, reasoningEffort, runLoop, sendEvent),
+        handlers: actionHandlers(state, dryRun, phase1Only, planningMode, actionProposalMs, actionBoundaryMs, model, maxOutputTokens, reasoningEffort, runLoop, sendEvent),
     });
     state.registerActionController(actionController.getId());
     const human = createHuman({ name: "Incident Commander", capabilities: ["incident-input"], handlers: [] });
@@ -1016,12 +1344,14 @@ export async function runIncidentScenario(options = {}) {
         const respondersComplete = ROLES.every((role) => state.spans.get(role)?.completedAtMs !== undefined);
         if (!respondersComplete || state.gateDecision === "pending")
             return false;
-        if (dryRun && state.gateDecision === "blocked" && state.adaptations.length === 0)
+        if (dryRun && planningMode === "post-aggregation" && state.gateDecision === "blocked" && state.adaptations.length === 0)
             return false;
         const expectedFollowupEvidence = simulateDependencyTimeout ? 1 : 2;
-        if (dryRun && state.gateDecision === "blocked" && state.evidence.length < expectedFollowupEvidence)
+        if (dryRun && planningMode === "post-aggregation" && state.gateDecision === "blocked" && state.evidence.length < expectedFollowupEvidence)
             return false;
         if (dryRun && (!state.actionProposed || state.actionExecutedTool === null))
+            return false;
+        if (dryRun && planningMode === "speculative-bounded" && state.staleReplanRequired && state.actionAttempts.length < 2)
             return false;
         if (!dryRun && !phase1Only && (!state.mitigationPhaseStarted || state.modelMitigationRecommendation === null))
             return false;

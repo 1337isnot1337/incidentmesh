@@ -73,6 +73,26 @@ function assertEvidenceShape(file, displayPath, text) {
     }
     return
   }
+  if (value?.schema === "incidentmesh.safe-action-ablation/v1") {
+    if (value.changedVariable !== "evidence scheduling only"
+      || value.concurrent?.gateAtBoundary !== "blocked"
+      || value.sequential?.gateAtBoundary !== "blocked"
+      || value.concurrent?.gateReasonAtBoundary !== "conflicting-evidence"
+      || value.sequential?.gateReasonAtBoundary !== "incomplete-required-evidence"
+      || value.concurrent?.executedTool !== "request_corroboration"
+      || value.sequential?.executedTool !== "request_corroboration") {
+      throw new Error(`${displayPath}: safe-action ablation invariants failed`)
+    }
+    return
+  }
+  if (value?.schema === "incidentmesh.degradation/v1") {
+    if (value.gateAtBoundary !== "blocked" || value.gateReasonAtBoundary !== "incomplete-required-evidence"
+      || value.executedTool !== "request_corroboration" || value.finalGate !== "blocked"
+      || !Array.isArray(value.degradedRoles) || value.degradedRoles.length === 0) {
+      throw new Error(`${displayPath}: degradation safety invariants failed`)
+    }
+    return
+  }
   if (value?.schema === "incidentmesh.provider-derived-ablation/v1") {
     for (const key of ["source", "fixedInputs", "changedVariable", "concurrent", "sequential", "hypothesesStableAcrossArms", "unauthorizedRollbackCrossing"]) {
       if (!(key in value)) throw new Error(`${displayPath}: missing required provider-derived field ${key}`)
@@ -82,7 +102,7 @@ function assertEvidenceShape(file, displayPath, text) {
     }
     return
   }
-  if (value?.schema === "incidentmesh.semantic-stability/v1") {
+  if (value?.schema === "incidentmesh.semantic-stability/v2") {
     for (const key of ["repetitionsPerArm", "runs", "semanticMismatches", "concurrent", "sequential"]) {
       if (!(key in value)) throw new Error(`${displayPath}: missing required semantic-stability field ${key}`)
     }

@@ -1,6 +1,7 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { runIncidentScenario } from "./app.js";
+import { runStalePlanAblation } from "./stale-plan.js";
 const repetitions = Number.parseInt(process.env.SEMANTIC_STABILITY_RUNS ?? "25", 10);
 if (!Number.isInteger(repetitions) || repetitions <= 0)
     throw new Error("SEMANTIC_STABILITY_RUNS must be a positive integer");
@@ -29,16 +30,52 @@ const expected = {
 const semanticMismatches = Object.keys(results).flatMap((scheduleMode) => results[scheduleMode]
     .map((report, index) => JSON.stringify(projection(report)) === JSON.stringify(expected[scheduleMode]) ? null : { scheduleMode, index })
     .filter((item) => item !== null));
-const elapsed = (scheduleMode) => results[scheduleMode].map((report) => report.elapsedMs);
-const range = (values) => ({ min: Math.min(...values), max: Math.max(...values) });
+const providerReceipt = JSON.parse(await readFile(resolve("docs/evidence/real-provider-run.json"), "utf8"));
+const staleRuns = [];
+for (let index = 0; index < repetitions; index += 1) {
+    staleRuns.push(await runStalePlanAblation({
+        source: {
+            receipt: "docs/evidence/real-provider-run.json",
+            commit: providerReceipt.commit,
+            provider: providerReceipt.provider,
+            model: providerReceipt.model,
+        },
+        evidence: providerReceipt.hypotheses,
+    }));
+}
+const staleProjection = (item) => ({
+    concurrent: {
+        planningRevision: item.concurrent.firstPlanningRevision,
+        boundaryRevision: item.concurrent.boundaryRevision,
+        fresh: item.concurrent.proposalFresh,
+        crossed: item.concurrent.boundedActionCrossed,
+        policyReason: item.concurrent.policyReason,
+        rewritten: item.concurrent.proposalRewritten,
+    },
+    sequential: {
+        planningRevision: item.sequential.firstPlanningRevision,
+        boundaryRevision: item.sequential.boundaryRevision,
+        fresh: item.sequential.proposalFresh,
+        crossed: item.sequential.boundedActionCrossed,
+        policyReason: item.sequential.policyReason,
+        rewritten: item.sequential.proposalRewritten,
+    },
+    invariants: item.invariants,
+});
+const expectedStaleProjection = staleProjection(staleRuns[0]);
+const stalePlanMismatches = staleRuns
+    .map((item, index) => JSON.stringify(staleProjection(item)) === JSON.stringify(expectedStaleProjection) ? null : { index })
+    .filter((item) => item !== null);
 const report = {
-    schema: "incidentmesh.semantic-stability/v1",
+    schema: "incidentmesh.semantic-stability/v2",
     repetitionsPerArm: repetitions,
-    runs: repetitions * 2,
+    runs: repetitions * 4,
     semanticMismatches,
-    concurrent: { expected: expected.concurrent, elapsedMs: range(elapsed("concurrent")) },
-    sequential: { expected: expected.sequential, elapsedMs: range(elapsed("sequential")) },
-    finding: "Observed timer jitter may shift elapsed milliseconds, but the canonical concurrent and sequential semantic projections remained stable across every repeated run.",
+    stalePlanMismatches,
+    concurrent: { expected: expected.concurrent },
+    sequential: { expected: expected.sequential },
+    stalePlan: { expected: expectedStaleProjection },
+    finding: "Host timer jitter is intentionally excluded from the receipt; the fixed-boundary and revision-stamped stale-plan semantic projections remained stable across every repeated run.",
 };
 const outputJson = resolve("docs/evidence/semantic-stability.json");
 const outputMd = resolve("docs/evidence/semantic-stability.md");
@@ -47,9 +84,8 @@ const markdown = `# IncidentMesh semantic-stability receipt\n\n` +
     `- Repetitions per arm: ${repetitions}\n` +
     `- Total runs: ${report.runs}\n` +
     `- Semantic mismatches: **${semanticMismatches.length}**\n` +
-    `- Concurrent elapsed range: ${report.concurrent.elapsedMs.min}–${report.concurrent.elapsedMs.max} ms\n` +
-    `- Sequential elapsed range: ${report.sequential.elapsedMs.min}–${report.sequential.elapsedMs.max} ms\n\n` +
-    `The expected projections include boundary gate reason, evidence available, safe action, interception, executed tool, and final gate. Millisecond ranges are observational only; no MTTR or production-speed claim is made.\n`;
+    `- Stale-plan semantic mismatches: **${stalePlanMismatches.length}**\n\n` +
+    `The expected projections include boundary gate reason, evidence available, safe action, interception, executed tool, final gate, and stale-plan freshness/crossing outcomes. Wall-clock values are intentionally excluded because this receipt proves repeatable semantics, not production latency or MTTR.\n`;
 await mkdir(dirname(outputJson), { recursive: true });
 await writeFile(outputJson, `${JSON.stringify(report, null, 2)}\n`, "utf8");
 await writeFile(outputMd, markdown, "utf8");

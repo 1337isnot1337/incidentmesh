@@ -48,9 +48,19 @@
     "hypothesesAtBoundary": 3,
     "contradictionsAtBoundary": 2,
     "boundarySnapshot": {
+      "attemptId": "attempt-1",
+      "planId": "plan-1",
+      "actionProducerId": "Action Controller",
+      "basedOnRevision": 3,
+      "boundaryRevision": 3,
+      "fresh": true,
       "atMs": 205,
       "investigationDecision": "blocked",
       "investigationReason": "conflicting-evidence",
+      "gateDecision": "blocked",
+      "gateReason": "conflicting-evidence",
+      "policyDecision": "blocked",
+      "policyReason": "conflicting-evidence",
       "decision": "blocked",
       "reason": "conflicting-evidence",
       "availableRoles": [
@@ -61,9 +71,86 @@
       "missingRequiredRoles": [],
       "degradedRoles": [],
       "confidence": 0.85,
+      "perRoleConfidence": {
+        "trace": 0.85,
+        "dependency": 0.82,
+        "impact": 0.88
+      },
       "contradictions": 2,
-      "proposedAction": "rollback_production"
+      "proposedAction": "rollback_production",
+      "actionRisk": "destructive",
+      "targetCause": null
     },
+    "plans": [
+      {
+        "planId": "plan-1",
+        "producerId": "Action Controller",
+        "basedOnRevision": 3,
+        "availableRoles": [
+          "trace",
+          "dependency",
+          "impact"
+        ],
+        "hypotheses": [
+          {
+            "role": "trace",
+            "claim": "p95 latency jumped on checkout requests before the error spike",
+            "confidence": 0.85,
+            "rootCause": "cache-stampede"
+          },
+          {
+            "role": "dependency",
+            "claim": "deploy 8f3 correlates with database-pool wait and queue growth",
+            "confidence": 0.82,
+            "rootCause": "deploy-8f3"
+          },
+          {
+            "role": "impact",
+            "claim": "38% of checkout attempts fail for users in us-east",
+            "confidence": 0.88,
+            "rootCause": "regional-impact"
+          }
+        ],
+        "startedAtMs": 205
+      }
+    ],
+    "attempts": [
+      {
+        "attemptId": "attempt-1",
+        "planId": "plan-1",
+        "actionProducerId": "Action Controller",
+        "basedOnRevision": 3,
+        "boundaryRevision": 3,
+        "fresh": true,
+        "atMs": 205,
+        "investigationDecision": "blocked",
+        "investigationReason": "conflicting-evidence",
+        "gateDecision": "blocked",
+        "gateReason": "conflicting-evidence",
+        "policyDecision": "blocked",
+        "policyReason": "conflicting-evidence",
+        "decision": "blocked",
+        "reason": "conflicting-evidence",
+        "availableRoles": [
+          "trace",
+          "dependency",
+          "impact"
+        ],
+        "missingRequiredRoles": [],
+        "degradedRoles": [],
+        "confidence": 0.85,
+        "perRoleConfidence": {
+          "trace": 0.85,
+          "dependency": 0.82,
+          "impact": 0.88
+        },
+        "contradictions": 2,
+        "proposedAction": "rollback_production",
+        "actionRisk": "destructive",
+        "targetCause": null
+      }
+    ],
+    "decisionRevision": 3,
     "boundarySafeAction": "canary-with-targeted-corroboration",
     "actionableSafePlan": "canary-with-targeted-corroboration",
     "actionableSafePlanAtMs": 205,
@@ -128,6 +215,12 @@
     },
     {
       "atMs": 80,
+      "type": "incident.decision.revision-advanced",
+      "producer": "Trace",
+      "detail": "decision revision 0 -> 1: trace hypothesis accepted"
+    },
+    {
+      "atMs": 80,
       "type": "awareness.peer-observed",
       "producer": "Dependency",
       "detail": "Dependency observed trace hypothesis"
@@ -149,6 +242,12 @@
       "type": "incident.hypothesis.emitted",
       "producer": "Dependency",
       "detail": "deploy 8f3 correlates with database-pool wait and queue growth"
+    },
+    {
+      "atMs": 130,
+      "type": "incident.decision.revision-advanced",
+      "producer": "Dependency",
+      "detail": "decision revision 1 -> 2: dependency hypothesis accepted"
     },
     {
       "atMs": 130,
@@ -176,6 +275,12 @@
     },
     {
       "atMs": 180,
+      "type": "incident.decision.revision-advanced",
+      "producer": "Impact",
+      "detail": "decision revision 2 -> 3: impact hypothesis accepted"
+    },
+    {
+      "atMs": 180,
       "type": "incident.gate.decision",
       "producer": "Safety Gate",
       "detail": "blocked: conflicting-evidence; 2 contradictions across 3 hypotheses; confidence 0.85 (evidence-aggregation)"
@@ -191,6 +296,12 @@
       "type": "awareness.peer-observed",
       "producer": "Dependency",
       "detail": "Dependency observed impact hypothesis"
+    },
+    {
+      "atMs": 205,
+      "type": "incident.plan.started",
+      "producer": "Action Controller",
+      "detail": "plan-1 started at revision 3 with roles=trace,dependency,impact"
     },
     {
       "atMs": 205,
@@ -221,6 +332,18 @@
       "type": "mozaik.interception.started",
       "producer": "Action Controller",
       "detail": "InterceptionHandler received rollback_production"
+    },
+    {
+      "atMs": 205,
+      "type": "incident.action.attempt-snapshotted",
+      "producer": "Action Controller",
+      "detail": "attempt-1 rollback_production plan=plan-1 revision=3->3 fresh policy=blocked:conflicting-evidence"
+    },
+    {
+      "atMs": 205,
+      "type": "incident.plan.proposed",
+      "producer": "Action Controller",
+      "detail": "plan-1 proposed rollback_production based on revision 3"
     },
     {
       "atMs": 205,

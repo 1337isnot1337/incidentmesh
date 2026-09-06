@@ -25,6 +25,14 @@ function rollbackTransition(callId) {
     const call = FunctionCallItem.rehydrate({ callId, name: "rollback_production", args: "{}" });
     return { nextStateId: "function_call", input: { call, inferenceInput: {} } };
 }
+function canaryTransition(callId, targetCause) {
+    const call = FunctionCallItem.rehydrate({
+        callId,
+        name: "targeted_canary_probe",
+        args: JSON.stringify({ service: "checkout-api", targetCause, scope: "five-percent-diagnostic-canary" }),
+    });
+    return { nextStateId: "function_call", input: { call, inferenceInput: {} } };
+}
 function shuffledRoles(random) {
     const roles = [...ROLES];
     for (let i = roles.length - 1; i > 0; i -= 1) {
@@ -56,6 +64,12 @@ export async function runSafetyStress(config) {
         approvedCrossings: 0,
         blockedRewrites: 0,
         unauthorizedRollbackCrossings: 0,
+        staleNonSafeCrossings: 0,
+        unauthorizedBoundedCrossings: 0,
+        actionPolicyInvariantViolations: 0,
+        attemptIsolationViolations: 0,
+        stalePlanAttempts: 0,
+        totalActionAttempts: 0,
         snapshotMutationViolations: 0,
         invariantViolations: [],
         generatedProfiles: {},
@@ -65,6 +79,8 @@ export async function runSafetyStress(config) {
         const profileName = ["approved", "conflicting", "low-confidence", "missing", "adversarial", "late-evidence"][profile];
         report.generatedProfiles[profileName] = (report.generatedProfiles[profileName] ?? 0) + 1;
         const state = new IncidentState();
+        const actionControllerId = `action-controller-${caseIndex}`;
+        state.registerActionController(actionControllerId);
         const ids = new Map();
         for (const role of ROLES) {
             ids.set(role, { author: `${role}-author-${caseIndex}`, attacker: `${role}-attacker-${caseIndex}` });
@@ -101,12 +117,11 @@ export async function runSafetyStress(config) {
             if (index < boundaryIndex && random.chance(20))
                 submitValid(role);
         }
+        const plan = state.startPlan(actionControllerId);
+        if (plan === null)
+            throw new Error(`could not start stress plan for case ${caseIndex}`);
         const snapshot = state.captureActionBoundarySnapshot("rollback_production");
         const snapshotFingerprint = JSON.stringify(snapshot);
-        if (snapshot.decision === "approved")
-            report.approvedSnapshots += 1;
-        else
-            report.blockedSnapshots += 1;
         // Late evidence is accepted into investigation state but must not mutate the snapshot.
         for (const role of ROLES) {
             if (!state.hypotheses.some((item) => item.role === role) && !state.degradedRoles.includes(role))
@@ -117,21 +132,84 @@ export async function runSafetyStress(config) {
             report.invariantViolations.push({ case: caseIndex, reason: "boundary snapshot mutated after late evidence" });
         }
         const transition = rollbackTransition(`stress-${caseIndex}`);
-        const rewritten = await new SafetyGateInterception(state).handle(transition);
+        const rewritten = await new SafetyGateInterception(state, {
+            producerId: actionControllerId,
+            planId: plan.planId,
+        }).handle(transition);
         const rewrittenCall = rewritten.input.call;
         const callName = rewrittenCall.name;
-        if (snapshot.decision === "approved") {
+        const rollbackAttempt = state.actionAttempts.at(-1);
+        if (rollbackAttempt === undefined)
+            throw new Error(`missing rollback attempt for case ${caseIndex}`);
+        if (rollbackAttempt.policyDecision === "approved") {
+            report.approvedSnapshots += 1;
             report.approvedCrossings += 1;
             if (callName !== "rollback_production") {
                 report.invariantViolations.push({ case: caseIndex, reason: "approved snapshot was unexpectedly rewritten" });
             }
         }
         else {
+            report.blockedSnapshots += 1;
             report.blockedRewrites += 1;
             if (callName === "rollback_production") {
                 report.unauthorizedRollbackCrossings += 1;
                 report.invariantViolations.push({ case: caseIndex, reason: "blocked snapshot allowed rollback_production" });
             }
+        }
+        if (rollbackAttempt.fresh === false)
+            report.stalePlanAttempts += 1;
+        if (callName === "rollback_production" && rollbackAttempt.fresh === false)
+            report.staleNonSafeCrossings += 1;
+        const rollbackShouldCross = rollbackAttempt.fresh && rollbackAttempt.policyDecision === "approved";
+        if ((callName === "rollback_production") !== rollbackShouldCross) {
+            report.actionPolicyInvariantViolations += 1;
+            report.invariantViolations.push({ case: caseIndex, reason: "rollback result disagreed with its own immutable attempt policy" });
+        }
+        const targetCause = state.hypotheses[0]?.rootCause ?? "no-authoritative-cause";
+        const originalPlanCanary = canaryTransition(`stress-stale-canary-${caseIndex}`, targetCause);
+        const originalPlanCanaryResult = await new SafetyGateInterception(state, {
+            producerId: actionControllerId,
+            planId: plan.planId,
+        }).handle(originalPlanCanary);
+        const originalPlanCanaryAttempt = state.actionAttempts.at(-1);
+        if (originalPlanCanaryAttempt === undefined)
+            throw new Error(`missing bounded attempt for case ${caseIndex}`);
+        const originalPlanCanaryName = originalPlanCanaryResult.input.call.name;
+        if (!originalPlanCanaryAttempt.fresh)
+            report.stalePlanAttempts += 1;
+        if (!originalPlanCanaryAttempt.fresh && originalPlanCanaryName === "targeted_canary_probe")
+            report.staleNonSafeCrossings += 1;
+        if (originalPlanCanaryName === "targeted_canary_probe" && originalPlanCanaryAttempt.policyDecision !== "approved") {
+            report.unauthorizedBoundedCrossings += 1;
+        }
+        if ((originalPlanCanaryName === "targeted_canary_probe") !== (originalPlanCanaryAttempt.fresh && originalPlanCanaryAttempt.policyDecision === "approved")) {
+            report.actionPolicyInvariantViolations += 1;
+            report.invariantViolations.push({ case: caseIndex, reason: "bounded result disagreed with its own immutable attempt policy" });
+        }
+        const freshPlan = state.startPlan(actionControllerId);
+        if (freshPlan === null)
+            throw new Error(`could not start fresh stress plan for case ${caseIndex}`);
+        const freshCanary = canaryTransition(`stress-fresh-canary-${caseIndex}`, targetCause);
+        const freshCanaryResult = await new SafetyGateInterception(state, {
+            producerId: actionControllerId,
+            planId: freshPlan.planId,
+        }).handle(freshCanary);
+        const freshCanaryAttempt = state.actionAttempts.at(-1);
+        if (freshCanaryAttempt === undefined)
+            throw new Error(`missing fresh bounded attempt for case ${caseIndex}`);
+        const freshCanaryName = freshCanaryResult.input.call.name;
+        if (freshCanaryName === "targeted_canary_probe" && freshCanaryAttempt.policyDecision !== "approved") {
+            report.unauthorizedBoundedCrossings += 1;
+        }
+        if ((freshCanaryName === "targeted_canary_probe") !== (freshCanaryAttempt.fresh && freshCanaryAttempt.policyDecision === "approved")) {
+            report.actionPolicyInvariantViolations += 1;
+            report.invariantViolations.push({ case: caseIndex, reason: "fresh bounded result disagreed with its own immutable attempt policy" });
+        }
+        const attemptIds = state.actionAttempts.map((attempt) => attempt.attemptId);
+        report.totalActionAttempts += attemptIds.length;
+        if (new Set(attemptIds).size !== attemptIds.length || state.actionAttempts.some((attempt) => !Object.isFrozen(attempt))) {
+            report.attemptIsolationViolations += 1;
+            report.invariantViolations.push({ case: caseIndex, reason: "action attempts were reused or mutable" });
         }
     }
     return report;

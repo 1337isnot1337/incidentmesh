@@ -13,11 +13,21 @@ export declare const ACTION_EXECUTION_REQUESTED = "incident.action.execution-req
 export declare const SAFE_ACTION_EXECUTED = "incident.action.safe-executed";
 export declare const RESPONDER_DEGRADED = "incident.responder.degraded";
 export declare const MITIGATION_PHASE_STARTED = "incident.mitigation.phase-started";
+export declare const DECISION_REVISION_ADVANCED = "incident.decision.revision-advanced";
+export declare const PLAN_STARTED = "incident.plan.started";
+export declare const PLAN_PROPOSED = "incident.plan.proposed";
+export declare const PLAN_STALE = "incident.plan.stale";
+export declare const PLAN_REPLAN_REQUESTED = "incident.plan.replan-requested";
+export declare const PLAN_REPLANNED = "incident.plan.replanned";
+export declare const ACTION_ATTEMPT_SNAPSHOTTED = "incident.action.attempt-snapshotted";
 export declare const ROLES: readonly ["trace", "dependency", "impact"];
 export type Role = (typeof ROLES)[number];
 export type ScheduleMode = "concurrent" | "sequential";
+export type PlanningMode = "post-aggregation" | "speculative-bounded";
 export type GateDecision = "blocked" | "approved" | "pending";
-export type GateReason = "pending-required-evidence" | "incomplete-required-evidence" | "conflicting-evidence" | "low-confidence-evidence" | "sufficient-consistent-evidence";
+export type ActionName = "request_corroboration" | "targeted_canary_probe" | "rollback_production";
+export type ActionRisk = "safe" | "bounded" | "destructive";
+export type GateReason = "pending-required-evidence" | "incomplete-required-evidence" | "conflicting-evidence" | "low-confidence-evidence" | "degraded-required-responder" | "sufficient-consistent-evidence";
 export type BoundarySafeAction = "rollback-approved" | "canary-with-targeted-corroboration" | "hold-for-missing-evidence" | "request-broader-corroboration";
 export type GateEvaluation = {
     decision: GateDecision;
@@ -27,19 +37,42 @@ export type GateEvaluation = {
     availableRoles: Role[];
     missingRequiredRoles: Role[];
 };
-export type ActionBoundarySnapshot = Readonly<{
+export type PlanContext = Readonly<{
+    planId: string;
+    producerId: string;
+    basedOnRevision: number;
+    availableRoles: readonly Role[];
+    hypotheses: readonly Readonly<Pick<Hypothesis, "role" | "claim" | "confidence" | "rootCause">>[];
+    startedAtMs: number;
+}>;
+export type ActionPolicyReason = GateReason | "safe-action" | "fresh-bounded-evidence" | "stale-plan" | "invalid-plan-provenance" | "insufficient-bounded-evidence" | "bounded-target-mismatch" | "degraded-evidence";
+export type ActionAttemptSnapshot = Readonly<{
+    attemptId: string;
+    planId: string;
+    actionProducerId: string;
+    basedOnRevision: number;
+    boundaryRevision: number;
+    fresh: boolean;
     atMs: number;
     investigationDecision: GateDecision;
     investigationReason: GateReason;
+    gateDecision: Exclude<GateDecision, "pending">;
+    gateReason: Exclude<GateReason, "pending-required-evidence">;
+    policyDecision: Exclude<GateDecision, "pending">;
+    policyReason: ActionPolicyReason;
     decision: Exclude<GateDecision, "pending">;
-    reason: Exclude<GateReason, "pending-required-evidence">;
+    reason: ActionPolicyReason;
     availableRoles: readonly Role[];
     missingRequiredRoles: readonly Role[];
     degradedRoles: readonly Role[];
     confidence: number;
+    perRoleConfidence: Readonly<Record<Role, number | null>>;
     contradictions: number;
-    proposedAction: "rollback_production";
+    proposedAction: ActionName;
+    actionRisk: ActionRisk;
+    targetCause: string | null;
 }>;
+export type ActionBoundarySnapshot = ActionAttemptSnapshot;
 export type HypothesisAcceptanceStatus = "accepted" | "late-accepted" | "duplicate" | "spoofed-role" | "unknown-role" | "malformed" | "closed-role";
 export type Hypothesis = {
     role: Role;
@@ -74,7 +107,7 @@ export type IncidentReport = {
     degradedRoles: Role[];
     action: {
         proposed: boolean;
-        requestedTool: "rollback_production" | null;
+        requestedTool: ActionName | null;
         boundaryMs: number | null;
         attemptedAtMs: number | null;
         gateAtBoundary: GateDecision | null;
@@ -82,11 +115,14 @@ export type IncidentReport = {
         hypothesesAtBoundary: number;
         contradictionsAtBoundary: number;
         boundarySnapshot: ActionBoundarySnapshot | null;
+        plans: PlanContext[];
+        attempts: ActionAttemptSnapshot[];
+        decisionRevision: number;
         boundarySafeAction: BoundarySafeAction | null;
         actionableSafePlan: "canary-with-targeted-corroboration" | null;
         actionableSafePlanAtMs: number | null;
         intercepted: boolean;
-        executedTool: "rollback_production" | "request_corroboration" | null;
+        executedTool: ActionName | null;
         mitigationPhaseStarted: boolean;
         modelRecommendation: string | null;
     };
@@ -113,10 +149,16 @@ export declare class IncidentState extends RuntimeState {
     private readonly responderIds;
     private safetyGateId;
     private actionControllerId;
+    private planSequence;
+    private attemptSequence;
+    private activePlanId;
+    private readonly planContexts;
+    private readonly attemptSnapshots;
+    decisionRevision: number;
     actionProposed: boolean;
     actionAttemptStarted: boolean;
     actionBoundaryMs: number | null;
-    requestedActionTool: "rollback_production" | null;
+    requestedActionTool: ActionName | null;
     actionAttemptedAtMs: number | null;
     gateAtActionBoundary: GateDecision | null;
     gateReasonAtActionBoundary: GateReason | null;
@@ -127,8 +169,10 @@ export declare class IncidentState extends RuntimeState {
     actionableSafePlan: "canary-with-targeted-corroboration" | null;
     actionableSafePlanAtMs: number | null;
     actionIntercepted: boolean;
-    actionExecutedTool: "rollback_production" | "request_corroboration" | null;
+    actionExecutedTool: ActionName | null;
     mitigationPhaseStarted: boolean;
+    staleReplanRequired: boolean;
+    freshReplanStarted: boolean;
     modelMitigationRecommendation: string | null;
     onTrace?: (event: TimelineEvent) => void;
     private readonly changeListeners;
@@ -139,12 +183,24 @@ export declare class IncidentState extends RuntimeState {
     isSafetyGateProducer(participantId: string): boolean;
     registerActionController(participantId: string): void;
     isActionControllerProducer(participantId: string): boolean;
-    markDegraded(role: Role): boolean;
+    private advanceDecisionRevision;
+    markDegraded(role: Role, producerId?: string): boolean;
     private recalculateAggregate;
     acceptHypothesis(producerId: string, payload: EventPayload): {
         status: HypothesisAcceptanceStatus;
         role?: Role;
     };
+    startPlan(producerId: string, planId?: string): PlanContext | null;
+    getPlan(planId: string): PlanContext | null;
+    get actionAttempts(): readonly ActionAttemptSnapshot[];
+    getActivePlan(): PlanContext | null;
+    private riskFor;
+    captureActionAttempt(input: {
+        proposedAction: ActionName;
+        producerId: string;
+        planId?: string | null;
+        targetCause?: string | null;
+    }): ActionAttemptSnapshot;
     captureActionBoundarySnapshot(proposedAction: "rollback_production"): ActionBoundarySnapshot;
     markActionableCanaryAvailable(): void;
     waitFor(predicate: () => boolean, timeoutMs: number): Promise<boolean>;
@@ -158,9 +214,20 @@ type CorroborationArgs = {
 };
 export declare function createRequestCorroborationTool(onInvoke?: (args: CorroborationArgs) => void): Tool;
 export declare const requestCorroborationTool: Tool;
+type CanaryProbeArgs = {
+    service: string;
+    targetCause: string;
+    scope: string;
+};
+export declare function createTargetedCanaryProbeTool(onInvoke?: (args: CanaryProbeArgs) => void): Tool;
+type InterceptionContext = {
+    producerId?: string;
+    planId?: string;
+};
 export declare class SafetyGateInterception implements InterceptionHandler {
     private readonly state;
-    constructor(state: IncidentState);
+    private readonly context;
+    constructor(state: IncidentState, context?: InterceptionContext);
     isSatisfiedBy(transition: ExecutableTransition): boolean;
     handle(transition: ExecutableTransition): Promise<ExecutableTransition>;
 }
@@ -175,6 +242,8 @@ export type ScenarioOptions = {
     reasoningEffort?: string;
     timeoutMs?: number;
     scheduleMode?: ScheduleMode;
+    planningMode?: PlanningMode;
+    speculativePlanningMs?: number;
     actionProposalMs?: number;
     actionBoundaryMs?: number;
     simulateDependencyTimeout?: boolean;

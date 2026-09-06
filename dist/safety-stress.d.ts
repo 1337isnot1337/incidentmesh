@@ -11,6 +11,12 @@ export type SafetyStressReport = {
     approvedCrossings: number;
     blockedRewrites: number;
     unauthorizedRollbackCrossings: number;
+    staleNonSafeCrossings: number;
+    unauthorizedBoundedCrossings: number;
+    actionPolicyInvariantViolations: number;
+    attemptIsolationViolations: number;
+    stalePlanAttempts: number;
+    totalActionAttempts: number;
     snapshotMutationViolations: number;
     invariantViolations: Array<{
         case: number;

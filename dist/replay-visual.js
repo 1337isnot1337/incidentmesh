@@ -44,6 +44,17 @@ const canonicalizeReport = async () => {
             return 180;
         if (item.type === "incident.action.execution-requested" || (item.type === "incident.gate.decision" && item.detail.includes("boundary hypotheses")))
             return 205;
+        if (item.type === "incident.decision.revision-advanced") {
+            if (item.detail.includes("revision 0 -> 1"))
+                return 80;
+            if (item.detail.includes("revision 1 -> 2"))
+                return 130;
+            if (item.detail.includes("revision 2 -> 3"))
+                return 180;
+        }
+        if (item.type === "incident.plan.started" || item.type === "incident.plan.proposed"
+            || item.type === "incident.action.attempt-snapshotted")
+            return 205;
         if (item.type.startsWith("mozaik.inference."))
             return 205;
         if (item.type.startsWith("mozaik.interception.") || item.type.startsWith("mozaik.function-call.") || item.type === "incident.action.safe-executed")
@@ -56,6 +67,15 @@ const canonicalizeReport = async () => {
             return 282;
         throw new Error(`no canonical replay timestamp for ${item.type} / ${item.producer} / ${item.detail}`);
     };
+    const canonicalAttempt = (attempt) => ({
+        ...attempt,
+        actionProducerId: "Action Controller",
+        atMs: 205,
+        availableRoles: [...attempt.availableRoles],
+        missingRequiredRoles: [...attempt.missingRequiredRoles],
+        degradedRoles: [...attempt.degradedRoles],
+        perRoleConfidence: { ...attempt.perRoleConfidence },
+    });
     return {
         ...liveReport,
         hypotheses: liveReport.hypotheses.map((item) => ({
@@ -67,12 +87,16 @@ const canonicalizeReport = async () => {
             attemptedAtMs: 205,
             actionableSafePlanAtMs: 205,
             boundarySnapshot: liveReport.action.boundarySnapshot === null ? null : {
-                ...liveReport.action.boundarySnapshot,
-                atMs: 205,
-                availableRoles: [...liveReport.action.boundarySnapshot.availableRoles],
-                missingRequiredRoles: [...liveReport.action.boundarySnapshot.missingRequiredRoles],
-                degradedRoles: [...liveReport.action.boundarySnapshot.degradedRoles],
+                ...canonicalAttempt(liveReport.action.boundarySnapshot),
             },
+            plans: liveReport.action.plans.map((plan) => ({
+                ...plan,
+                producerId: "Action Controller",
+                startedAtMs: 205,
+                availableRoles: [...plan.availableRoles],
+                hypotheses: plan.hypotheses.map((hypothesis) => ({ ...hypothesis })),
+            })),
+            attempts: liveReport.action.attempts.map(canonicalAttempt),
         },
         spans: liveReport.spans.map((span) => ({
             ...span,

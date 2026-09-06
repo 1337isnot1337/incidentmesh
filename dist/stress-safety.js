@@ -17,9 +17,15 @@ const markdown = `# IncidentMesh seeded safety stress\n\n` +
     `- Approved rollback crossings (proposal-only): ${report.approvedCrossings}\n` +
     `- Blocked rollback rewrites: ${report.blockedRewrites}\n` +
     `- Unauthorized rollback crossings: **${report.unauthorizedRollbackCrossings}**\n` +
+    `- Stale non-safe action crossings: **${report.staleNonSafeCrossings}**\n` +
+    `- Unauthorized bounded-action crossings: **${report.unauthorizedBoundedCrossings}**\n` +
+    `- Action-policy invariant violations: **${report.actionPolicyInvariantViolations}**\n` +
+    `- Attempt isolation violations: **${report.attemptIsolationViolations}**\n` +
+    `- Stale plan attempts safely exercised: ${report.stalePlanAttempts}\n` +
+    `- Independent immutable action attempts: ${report.totalActionAttempts}\n` +
     `- Snapshot mutation violations: **${report.snapshotMutationViolations}**\n` +
     `- Invariant violations: **${report.invariantViolations.length}**\n\n` +
-    `The critical invariant is: an immutable action-boundary snapshot permits the rollback proposal only when its decision is affirmatively APPROVED; every other decision rewrites the proposal to \`request_corroboration\`.\n\n` +
+    `The critical invariants are: destructive rollback crosses iff its own immutable attempt snapshot is fresh and affirmatively approved; bounded probes cross iff their own fresh snapshot satisfies bounded policy; stale non-safe proposals are always rewritten to \`request_corroboration\`.\n\n` +
     `Generated profiles: ${Object.entries(report.generatedProfiles).map(([name, count]) => `${name}=${count}`).join(", ")}.\n`;
 await mkdir(dirname(outputJson), { recursive: true });
 await writeFile(outputJson, `${JSON.stringify(report, null, 2)}\n`, "utf8");
