@@ -162,6 +162,7 @@ export declare function parseModelHypothesis(payload: unknown, _role: Role): Mod
 export declare function evaluateSafetyGate(hypotheses: readonly Hypothesis[], degradedRoles?: readonly Role[], scope?: "investigation" | "action-boundary"): GateEvaluation;
 export type ScenarioOptions = {
     dryRun?: boolean;
+    phase1Only?: boolean;
     model?: string;
     maxOutputTokens?: number;
     timeoutMs?: number;

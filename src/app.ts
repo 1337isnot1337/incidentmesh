@@ -564,6 +564,7 @@ function responderHandlers(
   role: Role,
   state: IncidentState,
   dryRun: boolean,
+  phase1Only: boolean,
   scheduleMode: ScheduleMode,
   simulateDependencyTimeout: boolean,
   model: string,
@@ -604,7 +605,7 @@ function responderHandlers(
         runLoop(participant.getId(), responderPrompt(role, state), {
           model,
           maxOutputTokens,
-          tools: participant.getTools(),
+          tools: phase1Only ? [] : participant.getTools(),
           structuredOutput: MODEL_HYPOTHESIS_OUTPUT,
           context: participant.getMemory().getContext(),
         }, new SafetyGateInterception(state))
@@ -727,6 +728,7 @@ function mitigationPrompt(state: IncidentState): string {
 function actionHandlers(
   state: IncidentState,
   dryRun: boolean,
+  phase1Only: boolean,
   actionProposalMs: number,
   actionBoundaryMs: number,
   model: string,
@@ -780,7 +782,7 @@ function actionHandlers(
     specification: isPeerType(GATE_DECISION),
     processor: {
       apply({ participant }) {
-        if (dryRun || state.mitigationPhaseStarted || !(participant instanceof Agent)) return
+        if (dryRun || phase1Only || state.mitigationPhaseStarted || !(participant instanceof Agent)) return
         state.mitigationPhaseStarted = true
         state.actionBoundaryMs = null
         sendEvent(event(MITIGATION_PHASE_STARTED, participant.getId(), {
@@ -957,7 +959,7 @@ function gateHandlers(state: IncidentState, sendEvent: (event: SemanticEvent, se
 }
 
 function frameworkObserverHandlers(state: IncidentState): SituationHandler[] {
-  const frameworkTypes = new Set(["interception.started", "interception.finished", "function_call.started", "function_call.completed"])
+  const frameworkTypes = new Set(["interception.started", "interception.finished", "function_call.started", "function_call.completed", "inference.started", "inference.completed"])
   return [{
     specification: new (class extends SituationSpecification {
       isSatisfiedBy({ event }: SituationContext): boolean {
@@ -967,6 +969,11 @@ function frameworkObserverHandlers(state: IncidentState): SituationHandler[] {
     processor: {
       apply({ event: frameworkEvent }) {
         const payload = frameworkEvent.payload as EventPayload
+        if (frameworkEvent.type === "inference.started" || frameworkEvent.type === "inference.completed") {
+          const modelName = typeof payload.model === "string" ? payload.model : "provider model"
+          state.record(`mozaik.${frameworkEvent.type}`, frameworkEvent.producerId, `${frameworkEvent.type} ${modelName}`)
+          return
+        }
         if (frameworkEvent.type === "interception.started") {
           const input = payload.input as { call?: { name?: string } } | undefined
           const callName = input?.call?.name
@@ -1038,6 +1045,7 @@ function observerHandlers(state: IncidentState): SituationHandler[] {
 
 export type ScenarioOptions = {
   dryRun?: boolean
+  phase1Only?: boolean
   model?: string
   maxOutputTokens?: number
   timeoutMs?: number
@@ -1052,6 +1060,7 @@ export type ScenarioOptions = {
 
 export async function runIncidentScenario(options: ScenarioOptions = {}): Promise<IncidentReport> {
   const dryRun = options.dryRun ?? true
+  const phase1Only = options.phase1Only ?? false
   const model = options.model ?? "gpt-5.5"
   const maxOutputTokens = options.maxOutputTokens ?? 350
   const scheduleMode = options.scheduleMode ?? "concurrent"
@@ -1083,7 +1092,7 @@ export async function runIncidentScenario(options: ScenarioOptions = {}): Promis
       capabilities: [ROLE_CONFIG[role].capability, "concurrent-response"],
       instruction: `You are the ${role} responder. Work independently, publish evidence, and react to peer events.`,
       tools: responderTools,
-      handlers: responderHandlers(role, state, dryRun, scheduleMode, simulateDependencyTimeout, model, maxOutputTokens, runLoop, sendEvent),
+      handlers: responderHandlers(role, state, dryRun, phase1Only, scheduleMode, simulateDependencyTimeout, model, maxOutputTokens, runLoop, sendEvent),
     })
     state.registerResponder(role, responder.getId())
     return responder
@@ -1111,7 +1120,7 @@ export async function runIncidentScenario(options: ScenarioOptions = {}): Promis
     capabilities: ["production-change", "action-boundary"],
     instruction: "Execute proposed incident mitigations only through the Safety Gate.",
     tools: actionTools,
-    handlers: actionHandlers(state, dryRun, actionProposalMs, actionBoundaryMs, model, maxOutputTokens, runLoop, sendEvent),
+    handlers: actionHandlers(state, dryRun, phase1Only, actionProposalMs, actionBoundaryMs, model, maxOutputTokens, runLoop, sendEvent),
   })
   const human = createHuman({ name: "Incident Commander", capabilities: ["incident-input"], handlers: [] })
   for (const participant of [observer, gate, ...responders, actionController, human]) join(participant)
@@ -1151,7 +1160,8 @@ export async function runIncidentScenario(options: ScenarioOptions = {}): Promis
     const expectedFollowupEvidence = simulateDependencyTimeout ? 1 : 2
     if (dryRun && state.gateDecision === "blocked" && state.evidence.length < expectedFollowupEvidence) return false
     if (dryRun && (!state.actionProposed || state.actionExecutedTool === null)) return false
-    if (!dryRun && (!state.mitigationPhaseStarted || state.modelMitigationRecommendation === null)) return false
+    if (!dryRun && !phase1Only && (!state.mitigationPhaseStarted || state.modelMitigationRecommendation === null)) return false
+    if (!dryRun && phase1Only && (state.hypotheses.length < ROLES.length || !ROLES.every((role) => state.spans.get(role)?.completedAtMs !== undefined))) return false
     return true
   }, timeoutMs)
   clearTimeout(evidenceDeadlineTimer)

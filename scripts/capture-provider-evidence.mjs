@@ -26,6 +26,7 @@ function usage() {
 function parseArgs(argv) {
   let mode = "check"
   let model = defaultModel
+  let phase1Only = false
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i]
     if (arg === "--help" || arg === "-h") return { help: true, mode, model }
@@ -34,9 +35,10 @@ function parseArgs(argv) {
     else if (arg === "--model") {
       model = argv[++i]
       if (!model) throw new Error("--model requires a value")
-    } else throw new Error(`unknown argument: ${arg}`)
+    } else if (arg === "--phase1-only") phase1Only = true
+    else throw new Error(`unknown argument: ${arg}`)
   }
-  return { help: false, mode, model }
+  return { help: false, mode, model, phase1Only }
 }
 
 function providerForModel(model) {
@@ -195,11 +197,12 @@ async function main() {
 
   const commit = git("rev-parse", "HEAD")
   const startedAt = new Date().toISOString()
-  const command = `RUN_MODEL=1 MODEL=${args.model} node dist/index.js`
+  const command = `RUN_MODEL=1 DRY_RUN=0 PHASE1_ONLY=${args.phase1Only ? 1 : 0} MODEL=${args.model} node dist/index.js`
   const result = await runChild(process.execPath, [join(projectRoot, "dist", "index.js")], {
     ...process.env,
     RUN_MODEL: "1",
     DRY_RUN: "0",
+    PHASE1_ONLY: args.phase1Only ? "1" : "0",
     MODEL: args.model,
   }, timeoutMs)
   const completedAt = new Date().toISOString()
@@ -220,6 +223,7 @@ async function main() {
   ]
   const evidence = {
     schema: "incidentmesh.provider-evidence/v1",
+    phase1Only: args.phase1Only,
     commit,
     provider,
     model: args.model,
@@ -235,6 +239,7 @@ async function main() {
     adaptations: report.adaptations,
     evidence: report.evidence,
     reportElapsedMs: report.elapsedMs,
+    inferenceEvents: report.timeline.filter((event) => event.type === "mozaik.inference.started" || event.type === "mozaik.inference.completed"),
     limitations,
   }
 

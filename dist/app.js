@@ -418,7 +418,7 @@ class DeterministicActionInferenceRunner {
         yield SemanticEvent.create("inference.output", "deterministic-action-runner", await this.run(request));
     }
 }
-function responderHandlers(role, state, dryRun, scheduleMode, simulateDependencyTimeout, model, maxOutputTokens, runLoop, sendEvent) {
+function responderHandlers(role, state, dryRun, phase1Only, scheduleMode, simulateDependencyTimeout, model, maxOutputTokens, runLoop, sendEvent) {
     const config = ROLE_CONFIG[role];
     const opened = {
         specification: isType(INCIDENT_OPENED),
@@ -455,7 +455,7 @@ function responderHandlers(role, state, dryRun, scheduleMode, simulateDependency
                 runLoop(participant.getId(), responderPrompt(role, state), {
                     model,
                     maxOutputTokens,
-                    tools: participant.getTools(),
+                    tools: phase1Only ? [] : participant.getTools(),
                     structuredOutput: MODEL_HYPOTHESIS_OUTPUT,
                     context: participant.getMemory().getContext(),
                 }, new SafetyGateInterception(state));
@@ -574,7 +574,7 @@ function mitigationPrompt(state) {
         "Choose the next mitigation using this shared evidence. If you choose a production rollback, call rollback_production; the Safety Gate will inspect that tool transition. If corroboration is required, account for the tool result and then give a concise final recommendation. Do not claim that Phase-1 responder models saw one another's evidence.",
     ].join("\n");
 }
-function actionHandlers(state, dryRun, actionProposalMs, actionBoundaryMs, model, maxOutputTokens, runLoop, sendEvent) {
+function actionHandlers(state, dryRun, phase1Only, actionProposalMs, actionBoundaryMs, model, maxOutputTokens, runLoop, sendEvent) {
     const deterministicBoundary = {
         specification: isType(INCIDENT_OPENED),
         processor: {
@@ -622,7 +622,7 @@ function actionHandlers(state, dryRun, actionProposalMs, actionBoundaryMs, model
         specification: isPeerType(GATE_DECISION),
         processor: {
             apply({ participant }) {
-                if (dryRun || state.mitigationPhaseStarted || !(participant instanceof Agent))
+                if (dryRun || phase1Only || state.mitigationPhaseStarted || !(participant instanceof Agent))
                     return;
                 state.mitigationPhaseStarted = true;
                 state.actionBoundaryMs = null;
@@ -780,7 +780,7 @@ function gateHandlers(state, sendEvent) {
     return [collectHypothesis, recordDegradation, decideAtActionBoundary];
 }
 function frameworkObserverHandlers(state) {
-    const frameworkTypes = new Set(["interception.started", "interception.finished", "function_call.started", "function_call.completed"]);
+    const frameworkTypes = new Set(["interception.started", "interception.finished", "function_call.started", "function_call.completed", "inference.started", "inference.completed"]);
     return [{
             specification: new (class extends SituationSpecification {
                 isSatisfiedBy({ event }) {
@@ -790,6 +790,11 @@ function frameworkObserverHandlers(state) {
             processor: {
                 apply({ event: frameworkEvent }) {
                     const payload = frameworkEvent.payload;
+                    if (frameworkEvent.type === "inference.started" || frameworkEvent.type === "inference.completed") {
+                        const modelName = typeof payload.model === "string" ? payload.model : "provider model";
+                        state.record(`mozaik.${frameworkEvent.type}`, frameworkEvent.producerId, `${frameworkEvent.type} ${modelName}`);
+                        return;
+                    }
                     if (frameworkEvent.type === "interception.started") {
                         const input = payload.input;
                         const callName = input?.call?.name;
@@ -863,6 +868,7 @@ function observerHandlers(state) {
 }
 export async function runIncidentScenario(options = {}) {
     const dryRun = options.dryRun ?? true;
+    const phase1Only = options.phase1Only ?? false;
     const model = options.model ?? "gpt-5.5";
     const maxOutputTokens = options.maxOutputTokens ?? 350;
     const scheduleMode = options.scheduleMode ?? "concurrent";
@@ -893,7 +899,7 @@ export async function runIncidentScenario(options = {}) {
             capabilities: [ROLE_CONFIG[role].capability, "concurrent-response"],
             instruction: `You are the ${role} responder. Work independently, publish evidence, and react to peer events.`,
             tools: responderTools,
-            handlers: responderHandlers(role, state, dryRun, scheduleMode, simulateDependencyTimeout, model, maxOutputTokens, runLoop, sendEvent),
+            handlers: responderHandlers(role, state, dryRun, phase1Only, scheduleMode, simulateDependencyTimeout, model, maxOutputTokens, runLoop, sendEvent),
         });
         state.registerResponder(role, responder.getId());
         return responder;
@@ -921,7 +927,7 @@ export async function runIncidentScenario(options = {}) {
         capabilities: ["production-change", "action-boundary"],
         instruction: "Execute proposed incident mitigations only through the Safety Gate.",
         tools: actionTools,
-        handlers: actionHandlers(state, dryRun, actionProposalMs, actionBoundaryMs, model, maxOutputTokens, runLoop, sendEvent),
+        handlers: actionHandlers(state, dryRun, phase1Only, actionProposalMs, actionBoundaryMs, model, maxOutputTokens, runLoop, sendEvent),
     });
     const human = createHuman({ name: "Incident Commander", capabilities: ["incident-input"], handlers: [] });
     for (const participant of [observer, gate, ...responders, actionController, human])
@@ -965,7 +971,9 @@ export async function runIncidentScenario(options = {}) {
             return false;
         if (dryRun && (!state.actionProposed || state.actionExecutedTool === null))
             return false;
-        if (!dryRun && (!state.mitigationPhaseStarted || state.modelMitigationRecommendation === null))
+        if (!dryRun && !phase1Only && (!state.mitigationPhaseStarted || state.modelMitigationRecommendation === null))
+            return false;
+        if (!dryRun && phase1Only && (state.hypotheses.length < ROLES.length || !ROLES.every((role) => state.spans.get(role)?.completedAtMs !== undefined)))
             return false;
         return true;
     }, timeoutMs);
