@@ -1,6 +1,6 @@
 # Final submission copy
 
-The first four sections are paste-ready JigJoy fields. They intentionally use plain text because the gallery renders these fields as plain text.
+The first five sections are paste-ready JigJoy fields. They intentionally use plain text because the gallery renders these fields as plain text.
 
 ## Project name
 
@@ -32,7 +32,18 @@ That is why concurrency matters here: it changes which decisions are still valid
 
 ## Demo/video URL
 
-Preserve the currently submitted demo/video URL when resubmitting. If none exists, add the final public recording after it is uploaded.
+https://www.youtube.com/watch?v=ohw8Ybt_dIM
+
+## Screenshots
+
+Use the four current gallery images, in this order:
+
+1. `docs/gallery/jigjoy-01-cover.png`
+2. `docs/gallery/jigjoy-02-ablation.png`
+3. `docs/gallery/jigjoy-03-interception.png`
+4. `docs/gallery/jigjoy-04-safety-proof.png`
+
+They cover the action boundary, stale-plan causal ablation, canonical interception receipt, and degradation/fail-closed behavior without relying on screenshots of prose or terminal output.
 
 ## Final tagline
 
@@ -49,7 +60,7 @@ npm run ablation:stale-plan
 npm run stress:safety
 ```
 
-Then see [`../judge-guide.md`](../judge-guide.md) for the five-minute walkthrough.
+Then see [`../judge-guide.md`](../judge-guide.md) for the five-minute walkthrough or [`../demo.md`](../demo.md) for the video-first verification path.
 
 Core evidence:
 
@@ -61,3 +72,16 @@ Core evidence:
 ## Scope
 
 The authenticated receipt is one historical bounded execution captured on its recorded commit; it is not rewritten as final-SHA evidence. The stale-plan counterfactual is a deterministic final-runtime replay of frozen provider hypotheses, not a live provider scheduling experiment. `targeted_canary_probe` and `rollback_production` are proposal-only fixtures. No production mutation, production-readiness, MTTR, generic speedup, simultaneous-token-generation, or dynamic in-flight prompt-editing claim is made.
+
+## Final resubmission checklist
+
+Before submitting the final revision, verify all of the following in the JigJoy form:
+
+- Project name is `IncidentMesh`.
+- Repository URL is `https://github.com/1337isnot1337/incidentmesh`.
+- Description is the paste-ready description above, not the older dense gallery copy.
+- Concurrency explanation is the paste-ready explanation above.
+- Demo/video URL is `https://www.youtube.com/watch?v=ohw8Ybt_dIM`.
+- All four current gallery screenshots are attached in the order above.
+- No field claims a production integration, MTTR improvement, generic speedup, live final-SHA provider run, or serialized destructive rollback crossing.
+- After submitting, open the public entry logged out and verify the repository link, video link, four screenshots, description, and concurrency explanation.
