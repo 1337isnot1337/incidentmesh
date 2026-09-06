@@ -238,6 +238,9 @@ async function main() {
   }
 
   const report = parseReport(result.stdout)
+  if (report.timeline?.some((item) => item.type === "incident.scenario.timeout")) {
+    throw new Error("provider scenario reported incident.scenario.timeout; no evidence files were written")
+  }
   const mozaikVersion = packageVersion("@mozaik-ai/core")
   const limitations = [
     "The report exposes IncidentMesh incident events, not raw provider request/response bodies or authorization metadata.",

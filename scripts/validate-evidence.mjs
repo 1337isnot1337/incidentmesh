@@ -22,17 +22,69 @@ function usage() {
   console.log("usage: node scripts/validate-evidence.mjs <evidence.json|evidence.md> [...]")
 }
 
+const responderNames = new Map([
+  ["trace", "Trace"],
+  ["dependency", "Dependency"],
+  ["impact", "Impact"],
+])
+
+function assertFiniteTime(value, label, displayPath) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    throw new Error(`${displayPath}: ${label} must be a finite non-negative number`)
+  }
+}
+
 function assertEvidenceShape(file, displayPath, text) {
   if (!file.endsWith(".json")) return
   const value = JSON.parse(text)
   if (value?.schema !== "incidentmesh.provider-evidence/v1") {
     throw new Error(`${displayPath}: unexpected or missing evidence schema`)
   }
-  for (const key of ["commit", "provider", "model", "startedAt", "completedAt", "participants", "events", "overlap", "gateDecision", "interceptionObserved", "action", "limitations"]) {
+  for (const key of ["commit", "provider", "model", "startedAt", "completedAt", "participants", "events", "overlap", "gateDecision", "interceptionObserved", "action", "hypotheses", "inferenceEvents", "limitations"]) {
     if (!(key in value)) throw new Error(`${displayPath}: missing required field ${key}`)
   }
-  if (!Array.isArray(value.participants) || !Array.isArray(value.events) || !Array.isArray(value.limitations)) {
-    throw new Error(`${displayPath}: participants, events, and limitations must be arrays`)
+  if (!Array.isArray(value.participants) || !Array.isArray(value.events) || !Array.isArray(value.hypotheses)
+    || !Array.isArray(value.inferenceEvents) || !Array.isArray(value.limitations)) {
+    throw new Error(`${displayPath}: participants, events, hypotheses, inferenceEvents, and limitations must be arrays`)
+  }
+
+  for (const role of responderNames.keys()) {
+    const hypotheses = value.hypotheses.filter((item) => item?.role === role)
+    if (hypotheses.length !== 1) throw new Error(`${displayPath}: expected exactly one accepted ${role} hypothesis`)
+    const hypothesis = hypotheses[0]
+    if (typeof hypothesis.claim !== "string" || hypothesis.claim.trim().length === 0
+      || typeof hypothesis.rootCause !== "string" || hypothesis.rootCause.trim().length === 0
+      || typeof hypothesis.confidence !== "number" || !Number.isFinite(hypothesis.confidence)
+      || hypothesis.confidence < 0 || hypothesis.confidence > 1) {
+      throw new Error(`${displayPath}: invalid accepted ${role} hypothesis`)
+    }
+  }
+
+  const timelineInferenceEvents = value.events.filter((item) =>
+    item?.type === "mozaik.inference.started" || item?.type === "mozaik.inference.completed")
+  if (JSON.stringify(timelineInferenceEvents) !== JSON.stringify(value.inferenceEvents)) {
+    throw new Error(`${displayPath}: inferenceEvents must exactly match inference lifecycle events in the primary timeline`)
+  }
+
+  const intervals = []
+  for (const [role, producer] of responderNames) {
+    const starts = timelineInferenceEvents.filter((item) => item?.type === "mozaik.inference.started" && item?.producer === producer)
+    const completions = timelineInferenceEvents.filter((item) => item?.type === "mozaik.inference.completed" && item?.producer === producer)
+    if (starts.length !== 1 || completions.length !== 1) {
+      throw new Error(`${displayPath}: expected exactly one inference start/completion pair for ${role}`)
+    }
+    const startedAtMs = starts[0].atMs
+    const completedAtMs = completions[0].atMs
+    assertFiniteTime(startedAtMs, `${role} inference start`, displayPath)
+    assertFiniteTime(completedAtMs, `${role} inference completion`, displayPath)
+    if (completedAtMs <= startedAtMs) throw new Error(`${displayPath}: ${role} inference completion must follow its start`)
+    intervals.push({ role, startedAtMs, completedAtMs })
+  }
+
+  const commonStartMs = Math.max(...intervals.map((item) => item.startedAtMs))
+  const commonEndMs = Math.min(...intervals.map((item) => item.completedAtMs))
+  if (commonEndMs <= commonStartMs) {
+    throw new Error(`${displayPath}: responder inference windows do not have positive three-way overlap`)
   }
 }
 
@@ -61,7 +113,8 @@ for (const input of files) {
     console.error(`${displayPath}: rejected: ${matches.map(({ name }) => name).join(", ")}`)
     failures += 1
   } else {
-    console.log(`${displayPath}: evidence structure and secret-pattern scan passed`)
+    const proof = file.endsWith(".json") ? "structure, three-role inference proof, and " : ""
+    console.log(`${displayPath}: evidence ${proof}secret-pattern scan passed`)
   }
 }
 
