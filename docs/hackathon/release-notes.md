@@ -1,23 +1,25 @@
-- Two-phase model-mode architecture: concurrent structured investigations feed aggregate gate state, then a dedicated Action Controller receives shared evidence with `SafetyGateInterception` attached.
-- Scripted model-mode integration test proves post-aggregation rollback interception and follow-up model recommendation without claiming a real-provider run.
-- Provider CLI preflight rejects missing credentials before loops start; later rejected inference terminates nonzero at a process-level boundary because Mozaik 4.0.5 `runLoop` returns `void`.
-- README/demo language now distinguishes runtime peer observation, deterministic application replanning, and actual model-context evidence.
-# 1.0.0 — IncidentMesh hackathon release
+# IncidentMesh final hackathon release candidate
 
-IncidentMesh is a concurrent incident-response prototype built on `@mozaik-ai/core` 4.0.5.
+## New causal architecture
 
-Current release highlights:
+- Added monotonic `decisionRevision` for authoritative action-relevant evidence and responder closure.
+- Added frozen revision-stamped `PlanContext` records.
+- Replaced singleton authorization with a distinct immutable `ActionAttemptSnapshot` per action attempt while preserving the latest-snapshot report view.
+- Added explicit safe / bounded / destructive action risk tiers.
+- Extended `SafetyGateInterception` to reject stale bounded or destructive actions before execution and route them to `request_corroboration`.
+- Added an actual Mozaik fresh replanning pass after stale invalidation.
 
-- Three independent responder lifecycles with 3 / 3 measured pairwise overlap.
-- Peer hypothesis observations while responder work is active.
-- Typed shared `IncidentState` where three distinct root-cause hypotheses produce two contradictions.
-- A Safety Gate whose blocked decision changes Impact's behavior from rollback intent to a canary plan.
-- Trace and Dependency reactions to that new plan, producing two follow-up corroboration events.
-- Canonical zero-key traversal of Mozaik's interception path: `rollback_production` is rewritten to the registered proposal-only `request_corroboration` tool and the safe tool executes.
-- Structured provider hypotheses that preserve claim, confidence, and root-cause data.
-- Fail-closed action-boundary handling for missing required evidence, including explicit timeout and generally hanging responder degradation.
-- A fixed-action-boundary causal ablation where evidence scheduling alone changes the safe control path available: conflict-informed canary immediately versus a conservative hold for missing evidence.
-- Event-driven scenario completion, bounded timeout behavior, and stable returned snapshots.
-- Product-first README, causal hero, social-preview asset, cleaned documentation layout, and GitHub Actions verification.
+## New proof
 
-The deterministic path is the canonical reproducible demo. It does not ingest live telemetry or execute real production changes; it does traverse Mozaik's real interception and function-call machinery using a deterministic inference fixture.
+- Added provider-derived stale-plan causal ablation: same plan/action/evidence/policy; only peer scheduling changes; concurrent revision 1 → 3 invalidates the in-flight bounded proposal, while serialization leaves it fresh.
+- Extended seeded stress to 10,000 cases and 40,000 per-attempt authorization records with zero critical violations.
+- Extended semantic stability to both causal experiments: 100 arm executions, zero mismatches.
+- Added byte-stable safe-action, stale-plan, degradation, and canonical replay evidence plus strict schema/invariant validation.
+
+## Preserved provider proof
+
+The historical authenticated Gemini Flash-Lite receipt remains unmodified. It proves 1,389 ms common three-way provider overlap, 3/3 hypotheses, blocked conflict, a real provider rollback proposal, real Mozaik interception, `request_corroboration` execution, and provider follow-up.
+
+## Safety retained
+
+Rollback remains proposal-only and requires a fresh immutable attempt with complete authoritative, non-degraded, individually high-confidence, consistent evidence. Missing, conflicting, malformed, spoofed, duplicate, stale, or closed-role evidence cannot authorize destructive action. Complete valid evidence still permits the approved proposal-only path, proving symmetry rather than an always-block design.

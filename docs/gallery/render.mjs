@@ -8,11 +8,13 @@ const root = fileURLToPath(new URL('../../', import.meta.url));
 const out = new URL('./', import.meta.url);
 const replay = JSON.parse(await readFile(new URL('../evidence/replay.json', import.meta.url)));
 const run = name => JSON.parse(execFileSync(process.execPath, ['--import','tsx',`src/${name}.ts`], {cwd:root,encoding:'utf8'}));
-const ablation = run('ablation'), degradation = run('degradation');
+const ablation = run('ablation'), stalePlan = run('stale-plan-ablation'), degradation = run('degradation');
 assert.equal(replay.action.intercepted, true);
 assert.equal(replay.action.executedTool, 'request_corroboration');
 assert.equal(ablation.concurrent.hypothesesAtBoundary, 3);
 assert.equal(ablation.sequential.hypothesesAtBoundary, 1);
+assert.equal(stalePlan.concurrent.proposalFresh, false);
+assert.equal(stalePlan.sequential.proposalFresh, true);
 assert.equal(degradation.gateAtBoundary, 'blocked');
 const C={ink:'#111e25',paper:'#f4f3e9',teal:'#79d7c7',coral:'#ffa58f',green:'#b7e9be',muted:'#abbdbf',line:'#30454b'};
 const esc=s=>String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
@@ -34,18 +36,19 @@ cover+=rect(658,383,878,273,C.coral,18)+text(700,444,'ACTION BOUNDARY',34,C.ink,
 cover+=text(697,715,'rollback_production',52,C.paper,500)+rect(658,741,878,73,C.green,12)+text(681,794,'↓',61,C.ink,700)+text(737,794,'request_corroboration',52,C.ink,600);
 cover+=text(70,864,'Mozaik rewrites the proposal.',30,C.muted);
 const cards=[['jigjoy-01-cover','Evidence before action',cover]];
-let compare=header('02 / CONTROLLED EXPERIMENT')+text(64,208,'Same policy. Only scheduling changes.',65,C.paper,700)+text(66,262,'Same incident · Same eventual evidence · Same proposal · Same configured boundary',29,C.muted);
+let compare=header('02 / STALE-PLAN CAUSAL ABLATION')+text(64,208,'The evidence changed while it was thinking.',65,C.paper,700)+text(66,262,'Same rev-1 plan · Same action · Same evidence · Only peer scheduling changes',29,C.muted);
 for(const [i,key] of ['concurrent','sequential'].entries()){
- const d=ablation[key], x=64+i*756;
+ const d=stalePlan[key], x=64+i*756, isConcurrent=i===0;
  compare+=rect(x,304,716,468,C.paper,16)+text(x+32,356,key.toUpperCase(),31,C.ink,700);
- compare+=text(x+32,452,`${d.hypothesesAtBoundary} / 3`,90,C.ink,700)+text(x+265,420,'required hypotheses',28,C.ink)+text(x+265,456,'at the boundary',28,C.ink);
- compare+=rect(x+32,487,652,68,C.coral,8)+text(x+53,535,'BLOCKED',40,C.ink,700);
- compare+=text(x+32,599,d.gateReasonAtBoundary,30,C.ink,600);
- compare+=text(x+32,672,i?'Hold / request missing evidence':'Targeted canary + corroboration',34,C.ink,700);
- compare+=text(x+32,721,i?'Targeted plan becomes available later.':'Actionable at the boundary.',28,C.ink);
+ compare+=rect(x+32,390,248,76,C.ink,9)+text(x+57,441,`PLAN  rev ${d.firstPlanningRevision}`,34,C.paper,700);
+ compare+=text(x+307,444,'→',52,C.ink,700)+rect(x+388,390,296,76,isConcurrent?C.coral:C.green,9)+text(x+414,441,`BOUNDARY  rev ${d.boundaryRevision}`,31,C.ink,700);
+ compare+=text(x+32,552,isConcurrent?'STALE':'FRESH',83,isConcurrent?'#a63a25':'#22684f',800);
+ compare+=text(x+32,606,'targeted_canary_probe',31,C.ink,600);
+ compare+=rect(x+32,635,652,66,isConcurrent?C.green:C.teal,8)+text(x+52,681,isConcurrent?'→ request_corroboration':'BOUNDED PROBE CROSSES',34,C.ink,700);
+ compare+=text(x+32,744,isConcurrent?'Fresh rev-3 replan sees conflict.':'Same conflict arrives later.',27,C.ink,600);
 }
-compare+=text(64,853,'BOTH FAIL CLOSED.',40,C.teal,700)+text(584,851,'Concurrency changes the available safe plan, not the safety rule.',29,C.paper);
-cards.push(['jigjoy-02-ablation','Both schedules fail closed; concurrency changes the available safe plan',compare]);
+compare+=text(64,853,'CONCURRENCY CHANGES WHICH DECISIONS ARE STILL VALID.',36,C.teal,700);
+cards.push(['jigjoy-02-ablation','Concurrency invalidates an in-flight stale plan',compare]);
 let receipt=header('03 / CANONICAL RUNTIME RECEIPT')+text(64,210,'The call changes before it executes.',65,C.paper,700);
 const sx=310, scale=2.8, boundary=sx+replay.action.boundaryMs*scale;
 receipt+=rect(64,259,1000,282,C.paper,14);
@@ -67,6 +70,10 @@ for(const [i,role] of ['Trace','Dependency','Impact'].entries()){
 safety+=text(765,331,`${degradation.hypothesesAvailable.length} / 3 required hypotheses`,41,C.paper,600)+rect(762,370,774,157,C.coral,14)+text(800,485,'BLOCKED',113,C.ink,800)+text(764,580,degradation.gateReasonAtBoundary,32,C.coral,600)+text(764,644,'rollback_production intercepted',35,C.paper)+text(764,709,`→ ${degradation.executedTool}`,38,C.green,600)+text(67,792,'Safe plan: hold for missing evidence; request surviving-signal corroboration.',32,C.paper);
 safety+=footer('Asserted dependency-timeout fixture · Proposal-only rollback · No provider claim');
 cards.push(['jigjoy-04-safety-proof','Missing required evidence blocks rollback',safety]);
+if(process.argv[2]==='--svg-only'){
+ for(const [name,title,body] of cards){await writeFile(new URL(`${name}.svg`,out),svg(title,body));console.log(name,'svg');}
+ process.exit(0);
+}
 const {chromium}=await import(process.argv[2] || 'playwright');
 const browser=await chromium.launch({headless:true});
 try {

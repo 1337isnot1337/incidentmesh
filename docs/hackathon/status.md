@@ -1,29 +1,32 @@
-# IncidentMesh handoff — 2026-09-05
+# IncidentMesh final-candidate status — 2026-09-06
 
-JIGJOY_STATUS=SUBMITTED
+Repository integration branch: `sol-maxscore-final-integration`.
 
-- Core narrative: three independent investigators disagree, and that disagreement changes what the system is allowed to do.
-- Product: concurrent incident-response agents on `@mozaik-ai/core@4.0.5`.
-- Concurrent responders: Trace, Dependency, Impact.
-- Shared participants: Safety Gate, Action Controller, Incident Console, Incident Commander.
-- Concurrency evidence: one `incident.opened` event starts all three responder lifecycles; 3 / 3 pairwise overlaps are measured and tested.
-- Peer awareness: runtime handlers observe peer hypothesis events while measured responder spans are active. Phase-1 model contexts do not receive peer hypotheses.
-- Shared-state disagreement: the deterministic fixture produces three distinct root-cause hypotheses, yielding two contradictions.
-- Canonical adaptivity: those contradictions drive `SAFETY GATE: BLOCKED`; deterministic application logic replans Impact to a canary; Trace and Dependency then emit two corroboration events.
-- Canonical interception: the zero-key deterministic demo produces a real `rollback_production` function call through a deterministic `InferenceRunner`; Mozaik's `AgentLoop` invokes `SafetyGateInterception`, rewrites it to `request_corroboration`, and executes the registered safe tool.
-- Model-mode architecture: three investigation-only Phase-1 structured-output loops feed shared state without mitigation tools; aggregate gate state then opens a separate Phase-2 Action Controller loop whose prompt includes the accepted authoritative hypotheses and whose rollback transition carries the real interceptor. Scripted tests and an authenticated Gemini Flash-Lite receipt prove this lifecycle.
-- Provider evidence tooling: safe-by-default check plus explicit bounded capture; staged evidence is secret/path-scanned before repository copy. The committed Gemini Flash-Lite receipt proves overlapping Phase-1 calls, blocked-gate interception, safe-tool execution, and provider follow-up.
-- Provider failure behavior: model-mode CLI preflight rejects missing credentials before loops start; later inference rejection terminates the CLI nonzero because Mozaik 4.0.5 `runLoop` does not expose its Promise.
-- Completion: the scenario waits for observable incident state instead of a fixed sleep, records a timeout if the run does not settle, and returns stable snapshots that do not mutate after return.
-- Causal ablation: same incident/evidence/confidence values/gate rule/rollback proposal/configured 205 ms boundary; both arms fail closed and execute `request_corroboration`, while concurrent scheduling has complete conflicting evidence and can select the canary path at the boundary and sequential scheduling must hold for missing evidence until the same conflict arrives later.
-- Degradation: explicit or generally hanging required responders become degraded at the evidence deadline; incomplete required evidence fails closed at the action boundary, rollback remains intercepted, and surviving responders continue.
-- Tests: twenty-seven focused invariant tests plus strict typecheck, production build, and built smoke verification, including snapshot-authoritative rollback, a 500-seed adversarial ordering sweep, per-responder confidence, closed degraded responders, investigation-only Phase 1, hanging-responder degradation, causal scheduling, Gemini compatibility, the scripted two-phase model lifecycle, approved-path execution, and phase-1 settling.
-- Overlap metric: representative deterministic runs measure ~220 ms concurrent wall time and ~505–508 ms summed responder durations, producing an approximately 2.3× latency/overlap proxy. It does not measure reasoning quality, throughput, MTTR, or production performance.
-- Replay surface: `npm run replay:visual` generates SVG + JSON from the canonical report for a submission-video timeline.
-- Presentation: product-first README, causal hero, repository-owned social-preview asset, explicit limitations, concise architecture, and CI workflow.
-- License: still `UNLICENSED`; no license was selected implicitly.
-- Submission status: submitted and publicly visible at https://build.jigjoy.ai/gallery/incidentmesh-40ad9c. The form permits later resubmission and judges the latest entry.
+## Proof status
 
-Remaining competitive gap: authenticated provider evidence is one bounded historical Gemini Flash-Lite execution; broader provider coverage and production reliability remain unclaimed.
+- **Real provider concurrency:** preserved historical Google `gemini-3.5-flash-lite` receipt with 1,389 ms common three-way inference overlap and 3/3 structured hypotheses.
+- **Authenticated Phase 2:** the same receipt records a real provider Action Controller proposing `rollback_production`, Mozaik `SafetyGateInterception`, actual `request_corroboration` execution, and provider follow-up.
+- **Causal concurrency:** final-runtime stale-plan ablation freezes those provider hypotheses. Both planners start at revision 1. Concurrent peers advance the boundary to revision 3, invalidate the proposal, and trigger a fresh conflict-aware replan; serialized peers leave the bounded proposal fresh until it crosses. Eventual evidence is identical.
+- **Safe-action availability:** fixed 205 ms fixture boundary; both rollback arms fail closed; concurrent complete conflict enables targeted safe planning, while sequential incomplete evidence requires a hold.
+- **Hard safety:** rollback passes iff its own immutable attempt is fresh and strictly approved. Bounded probes require their own fresh bounded-policy approval. Mutable live state is not an authorization fallback.
+- **Adversarial proof:** seed `0x1cedb00c`, 10,000 cases, 40,000 independent attempts, zero unauthorized rollback, bounded, or stale non-safe crossings; zero policy, isolation, or snapshot mutation violations.
+- **Semantic stability:** 25 repetitions per arm across two experiments (100 arm executions), zero semantic mismatches.
+- **Focused suite:** 36 tests plus typecheck, build, and built smoke verification.
 
-Remaining optional presentation item: upload the repository-ready `docs/assets/social-preview.png` through GitHub repository settings.
+## Architecture status
+
+Trace, Dependency, and Impact remain independent investigation-only Phase-1 responders. Accepted hypotheses and responder closure advance `decisionRevision`; invalid/spoofed/duplicate events do not. The separate Action Controller freezes a `PlanContext`. Each bounded/destructive function call crosses Mozaik enforcement and receives a distinct immutable `ActionAttemptSnapshot`.
+
+Risk tiers:
+
+- `request_corroboration`: safe;
+- `targeted_canary_probe`: bounded, reversible, proposal-only;
+- `rollback_production`: destructive, proposal-only, strict complete-evidence policy.
+
+## Claim limits
+
+No live production mutation, production readiness, MTTR, generic speedup, or dynamic in-flight prompt update is claimed. The authenticated receipt is historical evidence from its recorded commit. Final-runtime deterministic tools consume its structured hypotheses without rewriting receipt provenance.
+
+## Submission status
+
+The prior public slug was `incidentmesh-40ad9c`, but its detail endpoint previously returned 404 even while the gallery index listed it. Final resubmission and logged-out detail verification remain operator release gates; see [`submission-surface-audit.md`](submission-surface-audit.md).

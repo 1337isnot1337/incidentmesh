@@ -1,5 +1,7 @@
 # Gemini Phase-2 compatibility investigation
 
+> **Historical diagnostic record.** The blocker described below was resolved by the opt-in compatibility runner and is superseded by the authenticated [full Phase-2 receipt](real-provider-run.md). It is retained to document the upstream adapter failure and the scope of the compatibility fix.
+
 Status: **default adapter limitation reproduced; opt-in compatibility runner verified with an authenticated Gemini Flash-Lite Phase-2 receipt.**
 
 The original authenticated Phase-1 capture succeeded with `gemini-3.5-flash`. A full Phase-2 attempt using the default adapter reached the Action Controller's tool-call continuation, then Gemini returned HTTP 400 because the follow-up function-call parts did not contain the required `thought_signature`.
