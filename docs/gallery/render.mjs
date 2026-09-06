@@ -21,6 +21,8 @@ const esc=s=>String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll
 const text=(x,y,s,size=32,color=C.paper,weight=400,extra='')=>`<text x="${x}" y="${y}" font-size="${size}" fill="${color}" font-weight="${weight}" ${extra}>${esc(s)}</text>`;
 const rect=(x,y,w,h,fill,r=0)=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${r}" fill="${fill}"/>`;
 const line=(x,y,x2,y2,color=C.line,width=2,extra='')=>`<path d="M${x} ${y} L${x2} ${y2}" fill="none" stroke="${color}" stroke-width="${width}" ${extra}/>`;
+const arrowRight=(x,y,color=C.ink,width=4)=>`<path d="M${x} ${y} H${x+34} M${x+25} ${y-9} L${x+34} ${y} L${x+25} ${y+9}" fill="none" stroke="${color}" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round"/>`;
+const arrowDown=(x,y,color=C.ink,width=4)=>`<path d="M${x} ${y} V${y+34} M${x-9} ${y+25} L${x} ${y+34} L${x+9} ${y+25}" fill="none" stroke="${color}" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round"/>`;
 const mark=(x,y)=>`<g transform="translate(${x} ${y})"><path d="M0 0 H18 L54 32 M0 32 H54 M0 64 H18 L54 32" fill="none" stroke="${C.teal}" stroke-width="7"/><path d="M65 0 V64" stroke="${C.coral}" stroke-width="8"/></g>`;
 const header=(section)=>mark(64,52)+text(154,103,'IncidentMesh',54,C.paper,700)+text(1536,96,section,25,C.muted,500,'text-anchor="end"');
 const footer=s=>line(64,817,1536,817)+text(64,860,s,24,C.muted)+text(1536,860,'MOZAIK / INCIDENTMESH',22,C.muted,500,'text-anchor="end"');
@@ -33,7 +35,7 @@ for(const [i,label] of ['Trace','Dependency','Impact'].entries()){
 }
 cover+=line(584,549,639,549,C.teal,9)+`<path d="M622 531 L642 549 L622 567" fill="none" stroke="${C.teal}" stroke-width="8"/>`;
 cover+=rect(658,383,878,273,C.coral,18)+text(700,444,'ACTION BOUNDARY',34,C.ink,700)+text(693,597,'BLOCKED',145,C.ink,800);
-cover+=text(697,715,'rollback_production',52,C.paper,500)+rect(658,741,878,73,C.green,12)+text(681,794,'↓',61,C.ink,700)+text(737,794,'request_corroboration',52,C.ink,600);
+cover+=text(697,715,'rollback_production',52,C.paper,500)+rect(658,741,878,73,C.green,12)+arrowDown(704,752,C.ink,5)+text(737,794,'request_corroboration',52,C.ink,600);
 cover+=text(70,864,'Mozaik rewrites the proposal.',30,C.muted);
 const cards=[['jigjoy-01-cover','Evidence before action',cover]];
 let compare=header('02 / STALE-PLAN CAUSAL ABLATION')+text(64,208,'The evidence changed while it was thinking.',65,C.paper,700)+text(66,262,'Same rev-1 plan · Same action · Same evidence · Only peer scheduling changes',29,C.muted);
@@ -41,10 +43,10 @@ for(const [i,key] of ['concurrent','sequential'].entries()){
  const d=stalePlan[key], x=64+i*756, isConcurrent=i===0;
  compare+=rect(x,304,716,468,C.paper,16)+text(x+32,356,key.toUpperCase(),31,C.ink,700);
  compare+=rect(x+32,390,248,76,C.ink,9)+text(x+57,441,`PLAN  rev ${d.firstPlanningRevision}`,34,C.paper,700);
- compare+=text(x+307,444,'→',52,C.ink,700)+rect(x+388,390,296,76,isConcurrent?C.coral:C.green,9)+text(x+414,441,`BOUNDARY  rev ${d.boundaryRevision}`,31,C.ink,700);
+ compare+=arrowRight(x+306,428,C.ink,4)+rect(x+388,390,296,76,isConcurrent?C.coral:C.green,9)+text(x+414,441,`BOUNDARY  rev ${d.boundaryRevision}`,31,C.ink,700);
  compare+=text(x+32,552,isConcurrent?'STALE':'FRESH',83,isConcurrent?'#a63a25':'#22684f',800);
  compare+=text(x+32,606,'targeted_canary_probe',31,C.ink,600);
- compare+=rect(x+32,635,652,66,isConcurrent?C.green:C.teal,8)+text(x+52,681,isConcurrent?'→ request_corroboration':'BOUNDED PROBE CROSSES',34,C.ink,700);
+ compare+=rect(x+32,635,652,66,isConcurrent?C.green:C.teal,8)+(isConcurrent?arrowRight(x+52,668,C.ink,4)+text(x+104,681,'request_corroboration',34,C.ink,700):text(x+52,681,'BOUNDED PROBE CROSSES',34,C.ink,700));
  compare+=text(x+32,744,isConcurrent?'Fresh rev-3 replan sees conflict.':'Same conflict arrives later.',27,C.ink,600);
 }
 compare+=text(64,853,'CONCURRENCY CHANGES WHICH DECISIONS ARE STILL VALID.',36,C.teal,700);
@@ -58,7 +60,7 @@ for(const [i,span] of replay.spans.entries()){
 }
 receipt+=line(boundary,272,boundary,523,'#c6553b',4,'stroke-dasharray="8 6"')+text(1098,300,'205 ms',51,C.coral,700)+text(1098,345,'configured boundary',27,C.paper)+text(1098,395,'BLOCKED',47,C.coral,700)+text(1098,440,'● hypothesis published',25,C.teal)+text(1098,483,'Bars: responder spans',25,C.muted);
 const types=['mozaik.interception.started','mozaik.interception.rewritten','incident.action.safe-executed','incident.mitigation.replanned'];
-const labels=['InterceptionHandler receives rollback_production','SafetyGateInterception → request_corroboration','Safe tool executes','Impact selects canary + targeted corroboration'];
+const labels=['InterceptionHandler receives rollback_production','SafetyGateInterception -> request_corroboration','Safe tool executes','Impact selects canary + targeted corroboration'];
 types.forEach((type,i)=>{const e=replay.timeline.find(e=>e.type===type);assert.ok(e);const y=588+i*55;receipt+=text(64,y,`${e.atMs} ms`,28,C.teal,600)+text(230,y,labels[i],31,i===1?C.green:C.paper,i===1?700:400);});
 receipt+=footer('Canonical deterministic-fixture times · Not MTTR · No production rollback');
 cards.push(['jigjoy-03-interception','Canonical Mozaik interception evidence',receipt]);
@@ -67,7 +69,7 @@ safety+=rect(64,281,640,462,C.paper,16)+text(100,338,'REQUIRED RESPONDERS',26,C.
 for(const [i,role] of ['Trace','Dependency','Impact'].entries()){
  const y=414+i*107,missing=degradation.missingRequiredRoles.includes(role.toLowerCase());safety+=text(100,y,role,43,C.ink,700)+text(100,y+40,missing?'TIMEOUT / DEGRADED':'Hypothesis available',26,missing?'#a63a25':'#22684f',600);
 }
-safety+=text(765,331,`${degradation.hypothesesAvailable.length} / 3 required hypotheses`,41,C.paper,600)+rect(762,370,774,157,C.coral,14)+text(800,485,'BLOCKED',113,C.ink,800)+text(764,580,degradation.gateReasonAtBoundary,32,C.coral,600)+text(764,644,'rollback_production intercepted',35,C.paper)+text(764,709,`→ ${degradation.executedTool}`,38,C.green,600)+text(67,792,'Safe plan: hold for missing evidence; request surviving-signal corroboration.',32,C.paper);
+safety+=text(765,331,`${degradation.hypothesesAvailable.length} / 3 required hypotheses`,41,C.paper,600)+rect(762,370,774,157,C.coral,14)+text(800,485,'BLOCKED',113,C.ink,800)+text(764,580,degradation.gateReasonAtBoundary,32,C.coral,600)+text(764,644,'rollback_production intercepted',35,C.paper)+text(764,709,`-> ${degradation.executedTool}`,38,C.green,600)+text(67,792,'Safe plan: hold for missing evidence; request surviving-signal corroboration.',32,C.paper);
 safety+=footer('Asserted dependency-timeout fixture · Proposal-only rollback · No provider claim');
 cards.push(['jigjoy-04-safety-proof','Missing required evidence blocks rollback',safety]);
 if(process.argv[2]==='--svg-only'){
