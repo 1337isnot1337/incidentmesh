@@ -16,13 +16,13 @@ Independent responders share evidence that can change a production-action propos
   <img src="docs/assets/hero.svg" alt="Canonical demo: conflicting shared evidence blocks rollback_production; Mozaik rewrites the call to request_corroboration." width="960" />
 </picture>
 
-[Quick start](#quick-start) · [Causal proof](#causal-concurrency-ablation) · [Replay](#demo)
+[Quick start](#quick-start) · [Proof stack](#proof-stack) · [Causal proof](#causal-concurrency-ablation) · [Replay](#demo)
 
 ## Why IncidentMesh?
 
 Trace, Dependency, and Impact investigate concurrently and share their findings while peers are still working. The Safety Gate uses that evidence to decide what a pending rollback may safely do at the action boundary. **Parallel work changes the safe plan available at the boundary, not just the time it takes.**
 
-The default demo uses deterministic evidence and Mozaik's real function-call loop. Action tools are proposal-only; no production infrastructure is changed.
+The evidence is deliberately separated by claim: an authenticated Gemini run proves real model overlap, the deterministic ablation isolates the causal effect of scheduling, and Mozaik's real function-call loop proves action interception. The default demo remains credential-free and reproducible; action tools are proposal-only and no production infrastructure is changed.
 
 ## Quick start
 
@@ -36,6 +36,32 @@ npm run demo
 ```
 
 [![CI](https://github.com/1337isnot1337/incidentmesh/actions/workflows/ci.yml/badge.svg)](https://github.com/1337isnot1337/incidentmesh/actions/workflows/ci.yml) ![Node.js 20+](https://img.shields.io/badge/Node.js-20%2B-435461) ![Mozaik 4.0.5](https://img.shields.io/badge/Mozaik-4.0.5-435461)
+
+## Proof stack
+
+IncidentMesh does not ask one demo to prove three different things.
+
+| Claim | Evidence | Result |
+| --- | --- | --- |
+| **Real AI concurrency** | Authenticated Google Gemini Phase-1 receipt | Trace, Dependency, and Impact have **2,413 ms of three-way provider-inference overlap** |
+| **Scheduling is causal** | Deterministic concurrent-vs-serialized ablation | Same incident, evidence, policy, proposal, and boundary; concurrency makes the targeted safe plan actionable at the boundary instead of forcing a hold |
+| **The safety boundary executes** | Canonical Mozaik function-call run | `rollback_production` is intercepted and rewritten to `request_corroboration` |
+
+### Authenticated Gemini overlap
+
+One bounded Phase-1 capture on Google `gemini-3.5-flash` records three separate Mozaik responder inferences:
+
+| Responder | Inference started | Inference completed |
+| --- | ---: | ---: |
+| Trace | 4 ms | 2,418 ms |
+| Dependency | 5 ms | 2,881 ms |
+| Impact | 5 ms | 2,602 ms |
+
+`max(start) = 5 ms < min(completion) = 2,418 ms`, so all three provider calls were simultaneously in flight for **2,413 ms**. All three returned structured hypotheses into shared `IncidentState`; after the third arrived, the aggregate gate reached `BLOCKED — conflicting-evidence`.
+
+[Authenticated Gemini receipt](docs/evidence/real-provider-run.md) · [Raw evidence JSON](docs/evidence/real-provider-run.json)
+
+This receipt intentionally covers **Phase 1 only**. It proves authenticated concurrent model execution without making the causal experiment nondeterministic. The controlled ablation below proves what scheduling changes, and the canonical demo separately proves Mozaik's real interception path.
 
 ## Causal concurrency ablation
 
@@ -96,13 +122,21 @@ Accepted model evidence is also constrained: producer identity is bound to the r
 
 The default path uses scripted evidence and controlled delays. Optional model mode collects structured Phase-1 hypotheses, then starts a separate Phase-2 Action Controller with all shared hypotheses and the gate decision in its prompt.
 
+To repeat the bounded authenticated Phase-1 evidence capture with your own Gemini credential:
+
 ```bash
-OPENAI_API_KEY=... RUN_MODEL=1 npm run dev
+GEMINI_API_KEY=... npm run provider:evidence:capture -- --model gemini-3.5-flash --phase1-only
+```
+
+The full model-mode entry point remains:
+
+```bash
+OPENAI_API_KEY=... RUN_MODEL=1 MODEL=gpt-5.5 npm run dev
 ```
 
 Phase-1 peer observations happen in runtime handlers; peer hypotheses are not injected into those models. The Phase-2 controller receives the aggregate evidence. Its rollback calls pass through the same interception handler, and a rewritten tool result returns to the model loop.
 
-A scripted `InferenceRunner` integration test exercises this lifecycle through Mozaik's real loop. A separate [authenticated Gemini Phase-1 receipt](docs/evidence/real-provider-run.md) records one bounded run of all three responder model loops; the full provider-backed Phase-2 tool-call path remains a separate limitation.
+A scripted `InferenceRunner` integration test exercises the two-phase lifecycle through Mozaik's real loop. The committed Gemini receipt verifies authenticated Phase-1 responder concurrency; it does **not** claim a verified provider-backed Phase-2 tool-call execution.
 
 [Provider setup, failure behavior, and evidence capture](docs/implementation.md#deterministic-and-provider-backed-modes)
 
