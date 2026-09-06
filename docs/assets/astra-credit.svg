@@ -1,11 +1,47 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="148" height="44" viewBox="0 0 148 44" role="img" aria-labelledby="title desc">
   <title id="title">developed with gpt-6-astra</title>
-  <desc id="desc">Development credit with a custom a6 monogram.</desc>
-  <rect x=".5" y=".5" width="147" height="43" rx="10" fill="#101820" stroke="#30404b"/>
-  <rect x="7" y="7" width="30" height="30" rx="7" fill="#1b3438"/>
-  <text x="22" y="28" text-anchor="middle" fill="#8ee3c7" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="18" font-weight="700" letter-spacing="-1.5">a6</text>
+  <desc id="desc">A custom six-armed stellar spiral in the black, silver-white, and icy-blue palette of Astra's model artwork.</desc>
+  <defs>
+    <radialGradient id="space" cx="15%" cy="50%" r="90%">
+      <stop stop-color="#132139"/>
+      <stop offset=".42" stop-color="#080e19"/>
+      <stop offset="1" stop-color="#030508"/>
+    </radialGradient>
+    <linearGradient id="rim" x2="1" y2="1">
+      <stop stop-color="#71849e"/>
+      <stop offset=".45" stop-color="#263346"/>
+      <stop offset="1" stop-color="#45556d"/>
+    </linearGradient>
+    <linearGradient id="starlight" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#ffffff"/>
+      <stop offset=".45" stop-color="#dceaff"/>
+      <stop offset="1" stop-color="#6d94c5" stop-opacity=".25"/>
+    </linearGradient>
+    <path id="arm" d="M0 -3 C6 -8 14 -6 14 2" fill="none" stroke="url(#starlight)" stroke-width="1.2" stroke-linecap="round"/>
+  </defs>
+  <rect x=".5" y=".5" width="147" height="43" rx="10" fill="url(#space)" stroke="url(#rim)"/>
+  <g transform="translate(23 22)">
+    <circle r="16" fill="none" stroke="#adc9ed" stroke-opacity=".12" stroke-width=".6"/>
+    <use href="#arm"/>
+    <use href="#arm" transform="rotate(60)"/>
+    <use href="#arm" transform="rotate(120)"/>
+    <use href="#arm" transform="rotate(180)"/>
+    <use href="#arm" transform="rotate(240)"/>
+    <use href="#arm" transform="rotate(300)"/>
+    <path d="M0 -5 L1.2 -1.2 L5 0 L1.2 1.2 L0 5 L-1.2 1.2 L-5 0 L-1.2 -1.2Z" fill="#f4f8ff"/>
+    <g fill="#e6f0ff">
+      <circle cx="14" cy="2" r="1"/>
+      <circle cx="-5.3" cy="-13.1" r=".85"/>
+      <circle cx="-8.7" cy="11.1" r=".85"/>
+    </g>
+  </g>
+  <g fill="#a7c9f5" opacity=".5">
+    <circle cx="133" cy="9" r=".65"/>
+    <circle cx="139" cy="29" r=".45"/>
+    <circle cx="119" cy="37" r=".5"/>
+  </g>
   <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
-    <text x="47" y="17" fill="#b0c1cc" font-size="10">developed with</text>
-    <text x="47" y="33" fill="#f0f5f7" font-size="14" font-weight="600" letter-spacing=".2">gpt-6-astra</text>
+    <text x="47" y="17" fill="#a9b7cc" font-size="10">developed with</text>
+    <text x="47" y="33" fill="#f4f7ff" font-size="14" font-weight="600" letter-spacing=".2">gpt-6-astra</text>
   </g>
 </svg>

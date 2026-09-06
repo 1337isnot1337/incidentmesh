@@ -4,6 +4,8 @@ The wordmark pairs three incoming signals with an action boundary. Use the light
 
 Palette: ink `#101820`, evidence `#72d5c2`, blocked `#ffb18a`, safe rewrite `#8ee3c7`. SVGs use system fonts and contain no external resources.
 
+The Astra development credit uses its own black, silver-white, and icy-blue treatment, drawn from [OpenAI's Astra model artwork](https://developers.openai.com/images/api/models/icons/gpt-6-astra.png). Its six-armed stellar spiral is a custom emblem, not an official logo.
+
 ## Social preview
 
 `social-preview.png` is the upload-ready 1280 × 640 asset. `social-preview.svg` is its editable source. Upload the PNG in the repository's **Settings → General → Social preview**. Committing this file does not set GitHub's social preview.
