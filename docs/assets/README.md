@@ -8,7 +8,7 @@ The Astra development credit uses its own black, silver-white, and icy-blue trea
 
 ## Authenticated Gemini proof
 
-`gemini-proof.svg` summarizes the historical authenticated provider receipt without replacing it. The plot reserves a fixed gutter for exact timing labels, highlights the **1,389 ms** common three-way provider-call overlap, and shows the recorded Phase-2 path from `rollback_production` through `SafetyGateInterception` to `request_corroboration` and provider follow-up.
+`gemini-proof.svg` summarizes the historical authenticated provider receipt without replacing it. The plot reserves a fixed gutter for exact timing labels, highlights the **1,389 ms** common three-way provider-call overlap, and shows the recorded Phase-2 path from `rollback_production` through `SafetyGateInterception` to `request_corroboration` and provider follow-up. `gemini-proof-narrow.svg` carries the same facts in a stacked 440 × 560 composition so the evidence remains legible instead of being scaled down on narrow GitHub layouts.
 
 The arrows in this asset are vector paths rather than font glyphs so the rendering does not depend on a particular symbol font. The footer preserves the historical receipt provenance and explicitly avoids presenting it as final-SHA provider evidence.
 
@@ -34,7 +34,7 @@ Without the third path, the command runs a new canonical scenario. Default outpu
 
 ## Visual review
 
-All committed presentation SVGs were rasterized and visually inspected together after the README clarity pass: product mark, light/dark wordmarks, hero and narrow hero, Gemini proof, social preview, replay, Astra credit, and all four gallery source SVGs. The audit checked for clipping, collisions, unsupported glyphs, poor edge spacing, and misleading visual provenance.
+All committed presentation SVGs were rasterized and visually inspected together after the README clarity pass: product mark, light/dark wordmarks, hero and narrow hero, wide and narrow Gemini proof, social preview, replay, Astra credit, and all four gallery source SVGs. The audit checked for clipping, collisions, unsupported glyphs, poor edge spacing, and misleading visual provenance.
 
 The audit found and fixed three concrete rendering problems:
 
