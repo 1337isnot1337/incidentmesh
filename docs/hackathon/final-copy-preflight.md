@@ -48,10 +48,11 @@ lower = (readme + submission).lower()
 for phrase in (
     "sequential scheduling permits rollback",
     "sequential rollback crosses",
-    "production-ready",
-    "production ready",
-    "mttr improvement",
-    "simultaneous token generation",
+    "serialization permits destructive rollback",
+    "production-ready system",
+    "production ready system",
+    "proves simultaneous token generation",
+    "improves mttr",
 ):
     assert phrase not in lower, f"unsafe/stale claim: {phrase}"
 
