@@ -13,8 +13,8 @@ JIGJOY_STATUS=SUBMISSION_READY
 - Tests: clean `npm ci`, `npm run verify`; strict typecheck, 3 passing tests, production build, and built smoke verification.
 - Benchmark: representative dry-run concurrent wall time ~220 ms vs summed sequential baseline ~505 ms; 2.3× speedup proxy; same three hypotheses; 3/3 overlap pairs.
 - Demo: `npm run demo`; narration in `DEMO.md`.
-- Repo status: public at https://github.com/1337isnot1337/incidentmesh; product-style repository name; latest pushed commit passed a fresh clone validation.
-- Submission status: not submitted; repository is ready for the official submission form.
+- Repo status: public at https://github.com/1337isnot1337/incidentmesh; product-style repository name; latest pushed commit passed a fresh clone validation with `npm ci` and `npm run verify`.
+- Submission status: not submitted; repository is ready for the official submission form, pending the registered application email and optional demo/video URL.
 - Deadline: Monday, September 7, 2026 at 09:00 CET / 03:00 ET; resubmission is allowed and latest entry is judged.
 - Cash prize target: top three; $500 / $300 / $200.
 
@@ -22,6 +22,6 @@ Highest remaining weakness: no demo/video URL or live deployment is attached; bo
 
 Next three improvements before the deadline:
 
-1. Publish the committed project from an explicitly authorized neutral competition identity and verify the public clone/install.
+1. Submit the public repository URL through the official form using the registered application email.
 2. Record a 60–90 second screen capture of `npm run demo`, or use the terminal demo live if video tooling is unavailable.
 3. If time permits, run one real-provider demo privately and capture a sanitized trace showing the same handlers using Mozaik `runLoop`; keep the deterministic path as the judging fallback.
