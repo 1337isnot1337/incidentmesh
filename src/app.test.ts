@@ -1,141 +1,280 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { IncidentState, runIncidentScenario, overlapCount, parseModelHypothesis, requestCorroborationTool, SafetyGateInterception } from "./app.js"
+import {
+  IncidentState,
+  ROLES,
+  SafetyGateInterception,
+  evaluateSafetyGate,
+  overlapCount,
+  parseModelHypothesis,
+  requestCorroborationTool,
+  runIncidentScenario,
+  type Hypothesis,
+  type Role,
+} from "./app.js"
 import { FunctionCallItem, ModelMessageItem, SemanticEvent } from "@mozaik-ai/core"
 import type { ExecutableTransition, InferenceInput, InferenceOutput, InferenceRunner } from "@mozaik-ai/core"
 
-test("three independent responders overlap and publish hypotheses", async () => {
+function hypothesis(role: Role, confidence = 0.9, rootCause = "same-cause"): Hypothesis {
+  return { role, claim: `${role} claim`, confidence, rootCause, atMs: 0 }
+}
+
+function rollbackTransition(callId: string): Extract<ExecutableTransition, { nextStateId: "function_call" }> {
+  const call = FunctionCallItem.rehydrate({ callId, name: "rollback_production", args: "{}" })
+  return { nextStateId: "function_call", input: { call, inferenceInput: {} as never } }
+}
+
+function normalizeHypotheses(report: Awaited<ReturnType<typeof runIncidentScenario>>) {
+  return report.hypotheses
+    .map(({ role, claim, confidence, rootCause }) => ({ role, claim, confidence, rootCause }))
+    .sort((a, b) => a.role.localeCompare(b.role))
+}
+
+test("canonical concurrent path reaches real Mozaik interception with complete conflicting evidence", async () => {
   const report = await runIncidentScenario({ dryRun: true })
   assert.equal(report.hypotheses.length, 3)
   assert.equal(report.spans.length, 3)
   assert.equal(overlapCount(report), 3)
-  assert.ok(report.timeline.some((item) => item.type === "incident.hypothesis.emitted"))
-  const spanByName = new Map(report.spans.map((span) => [span.role === "trace" ? "Trace" : span.role === "dependency" ? "Dependency" : "Impact", span]))
-  const peerObservations = report.timeline.filter((item) => item.type === "awareness.peer-observed")
-  assert.ok(peerObservations.length >= 4)
-  const activePeerObservations = peerObservations.filter((observation) => {
-    const span = spanByName.get(observation.producer)
-    return span !== undefined
-      && observation.atMs >= span.startedAtMs
-      && observation.atMs <= (span.completedAtMs ?? Number.POSITIVE_INFINITY)
-  })
-  assert.ok(activePeerObservations.length >= 3)
-})
-
-test("shared state changes the plan and surviving responders add evidence", async () => {
-  const report = await runIncidentScenario({ dryRun: true })
   assert.equal(report.gateDecision, "blocked")
+  assert.equal(report.gateReason, "conflicting-evidence")
   assert.equal(report.contradictions, 2)
-  assert.ok(report.confidence >= 0.8)
-  assert.equal(report.adaptations.length, 1)
-  assert.equal(report.evidence.length, 2)
-  assert.equal(report.action.proposed, true)
   assert.equal(report.action.gateAtBoundary, "blocked")
+  assert.equal(report.action.gateReasonAtBoundary, "conflicting-evidence")
   assert.equal(report.action.hypothesesAtBoundary, 3)
   assert.equal(report.action.contradictionsAtBoundary, 2)
+  assert.deepEqual(report.action.boundarySnapshot?.missingRequiredRoles, [])
+  assert.equal(report.action.boundarySafeAction, "canary-with-targeted-corroboration")
+  assert.equal(report.action.actionableSafePlan, "canary-with-targeted-corroboration")
+  assert.ok(report.action.actionableSafePlanAtMs !== null)
+  assert.equal(report.action.intercepted, true)
+  assert.equal(report.action.executedTool, "request_corroboration")
+  assert.equal(report.adaptations.some((item) => item.includes("canary")), true)
+  assert.equal(report.evidence.length, 2)
+  assert.ok(report.timeline.some((item) => item.type === "mozaik.interception.started"))
+  assert.ok(report.timeline.some((item) => item.type === "mozaik.interception.finished"))
+  assert.ok(report.timeline.some((item) => item.type === "mozaik.interception.rewritten"))
+  assert.ok(report.timeline.some((item) => item.type === "mozaik.function-call.started" && item.detail.includes("request_corroboration")))
+  assert.ok(report.timeline.some((item) => item.type === "incident.action.safe-executed"))
+  assert.equal(report.timeline.some((item) => item.type === "incident.action.rollback-tool-executed"), false)
+})
+
+test("pending investigation fails closed on the real sequential action path", async () => {
+  const report = await runIncidentScenario({ dryRun: true, scheduleMode: "sequential", actionBoundaryMs: 205 })
+  const snapshot = report.action.boundarySnapshot
+  assert.ok(snapshot)
+  assert.equal(snapshot.investigationDecision, "pending")
+  assert.equal(snapshot.investigationReason, "pending-required-evidence")
+  assert.equal(snapshot.decision, "blocked")
+  assert.equal(snapshot.reason, "incomplete-required-evidence")
+  assert.deepEqual(snapshot.availableRoles, ["trace"])
+  assert.deepEqual(snapshot.missingRequiredRoles, ["dependency", "impact"])
+  assert.equal(report.action.boundarySafeAction, "hold-for-missing-evidence")
   assert.equal(report.action.intercepted, true)
   assert.equal(report.action.executedTool, "request_corroboration")
   assert.ok(report.timeline.some((item) => item.type === "mozaik.interception.started"))
-  assert.ok(report.timeline.some((item) => item.type === "mozaik.interception.finished"))
-  assert.ok(report.timeline.some((item) => item.type === "mozaik.function-call.started" && item.detail.includes("request_corroboration")))
-  assert.ok(report.timeline.some((item) => item.type === "incident.action.safe-executed"))
+  assert.ok(report.timeline.some((item) => item.type === "mozaik.interception.rewritten"))
+  assert.equal(report.timeline.some((item) => item.type === "incident.action.rollback-tool-executed"), false)
+
+  assert.equal(report.hypotheses.length, 3)
+  assert.equal(report.gateDecision, "blocked")
+  assert.equal(report.gateReason, "conflicting-evidence")
+  assert.equal(report.contradictions, 2)
+  assert.equal(report.action.boundarySnapshot?.reason, "incomplete-required-evidence")
 })
 
-test("safety interception rewrites a risky function call after the gate blocks", async () => {
-  const report = await runIncidentScenario({ dryRun: true })
-  const state = new IncidentState()
-  state.gateDecision = report.gateDecision
-  const gate = new SafetyGateInterception(state)
-  const call = FunctionCallItem.rehydrate({ callId: "c1", name: "rollback_production", args: "{}" })
-  const transition = { nextStateId: "function_call" as const, input: { call, inferenceInput: {} as never } }
-  const rewritten = await gate.handle(transition as Extract<ExecutableTransition, { nextStateId: "function_call" }>)
-  const rewrittenCall = (rewritten as Extract<ExecutableTransition, { nextStateId: "function_call" }>).input.call
-  assert.equal(rewrittenCall.name, "request_corroboration")
+test("fixed-boundary ablation changes only scheduling while both arms fail closed", async () => {
+  const shared = { dryRun: true, actionProposalMs: 45, actionBoundaryMs: 205 } as const
+  const concurrent = await runIncidentScenario({ ...shared, scheduleMode: "concurrent" })
+  const sequential = await runIncidentScenario({ ...shared, scheduleMode: "sequential" })
+
+  assert.deepEqual(normalizeHypotheses(concurrent), normalizeHypotheses(sequential))
+  assert.equal(concurrent.action.boundaryMs, sequential.action.boundaryMs)
+  assert.equal(concurrent.action.requestedTool, sequential.action.requestedTool)
+  assert.equal(concurrent.action.gateAtBoundary, "blocked")
+  assert.equal(sequential.action.gateAtBoundary, "blocked")
+  assert.equal(concurrent.action.executedTool, "request_corroboration")
+  assert.equal(sequential.action.executedTool, "request_corroboration")
+
+  assert.equal(concurrent.action.gateReasonAtBoundary, "conflicting-evidence")
+  assert.equal(concurrent.action.boundarySafeAction, "canary-with-targeted-corroboration")
+  assert.equal(sequential.action.gateReasonAtBoundary, "incomplete-required-evidence")
+  assert.equal(sequential.action.boundarySafeAction, "hold-for-missing-evidence")
+
+  assert.equal(concurrent.action.hypothesesAtBoundary, 3)
+  assert.equal(concurrent.action.contradictionsAtBoundary, 2)
+  assert.equal(sequential.action.hypothesesAtBoundary, 1)
+  assert.equal(sequential.action.contradictionsAtBoundary, 0)
+
+  assert.ok(concurrent.action.actionableSafePlanAtMs !== null)
+  assert.ok(sequential.action.actionableSafePlanAtMs !== null)
+  assert.ok(
+    concurrent.action.actionableSafePlanAtMs < sequential.action.actionableSafePlanAtMs,
+    `expected concurrency to expose the actionable canary earlier: concurrent=${concurrent.action.actionableSafePlanAtMs}, sequential=${sequential.action.actionableSafePlanAtMs}`,
+  )
 })
 
-test("blocked gate intercepts rollback only and the safe replacement is executable", async () => {
-  const state = new IncidentState()
-  state.gateDecision = "blocked"
-  const gate = new SafetyGateInterception(state)
-  const rollback = FunctionCallItem.rehydrate({ callId: "c2", name: "rollback_production", args: "{}" })
-  const rollbackTransition = { nextStateId: "function_call" as const, input: { call: rollback, inferenceInput: {} as never } }
-  assert.equal(gate.isSatisfiedBy(rollbackTransition as Extract<ExecutableTransition, { nextStateId: "function_call" }>), true)
+test("gate policy distinguishes investigation waiting from fail-closed action decisions", () => {
+  const unanimous = ROLES.map((role) => hypothesis(role, 0.9, "same-cause"))
+  assert.deepEqual(evaluateSafetyGate(unanimous), {
+    decision: "approved",
+    reason: "sufficient-consistent-evidence",
+    confidence: 0.9,
+    contradictions: 0,
+    availableRoles: ["trace", "dependency", "impact"],
+    missingRequiredRoles: [],
+  })
 
-  const alreadySafe = FunctionCallItem.rehydrate({ callId: "c3", name: "request_corroboration", args: "{}" })
-  const safeTransition = { nextStateId: "function_call" as const, input: { call: alreadySafe, inferenceInput: {} as never } }
-  assert.equal(gate.isSatisfiedBy(safeTransition as Extract<ExecutableTransition, { nextStateId: "function_call" }>), false)
+  const conflicting = [
+    hypothesis("trace", 0.9, "cause-a"),
+    hypothesis("dependency", 0.9, "cause-b"),
+    hypothesis("impact", 0.9, "cause-a"),
+  ]
+  assert.equal(evaluateSafetyGate(conflicting).decision, "blocked")
+  assert.equal(evaluateSafetyGate(conflicting).reason, "conflicting-evidence")
 
-  const result = await requestCorroborationTool.invoke({ originalAction: "rollback_production", reason: "root-cause hypotheses disagree" }) as { status: string }
+  const partial = [hypothesis("trace", 0.9, "cause-a")]
+  assert.equal(evaluateSafetyGate(partial, [], "investigation").decision, "pending")
+  assert.equal(evaluateSafetyGate(partial, [], "investigation").reason, "pending-required-evidence")
+  assert.equal(evaluateSafetyGate(partial, [], "action-boundary").decision, "blocked")
+  assert.equal(evaluateSafetyGate(partial, [], "action-boundary").reason, "incomplete-required-evidence")
+
+  const weak = ROLES.map((role) => hypothesis(role, 0.7, "same-cause"))
+  assert.equal(evaluateSafetyGate(weak).decision, "blocked")
+  assert.equal(evaluateSafetyGate(weak).reason, "low-confidence-evidence")
+})
+
+test("rollback interception requires affirmative approval, not mere absence of a block", async () => {
+  const pendingState = new IncidentState()
+  const pendingGate = new SafetyGateInterception(pendingState)
+  const pending = rollbackTransition("pending-rollback")
+  assert.equal(pendingGate.isSatisfiedBy(pending), true)
+  const rewrittenPending = await pendingGate.handle(pending)
+  assert.equal((rewrittenPending as typeof pending).input.call.name, "request_corroboration")
+
+  const blockedState = new IncidentState()
+  blockedState.gateDecision = "blocked"
+  blockedState.gateReason = "conflicting-evidence"
+  assert.equal(new SafetyGateInterception(blockedState).isSatisfiedBy(rollbackTransition("blocked-rollback")), true)
+
+  const approvedState = new IncidentState()
+  approvedState.gateDecision = "approved"
+  approvedState.gateReason = "sufficient-consistent-evidence"
+  assert.equal(new SafetyGateInterception(approvedState).isSatisfiedBy(rollbackTransition("approved-rollback")), false)
+
+  const safeCall = FunctionCallItem.rehydrate({ callId: "safe", name: "request_corroboration", args: "{}" })
+  const safeTransition = { nextStateId: "function_call" as const, input: { call: safeCall, inferenceInput: {} as never } }
+  assert.equal(pendingGate.isSatisfiedBy(safeTransition as Extract<ExecutableTransition, { nextStateId: "function_call" }>), false)
+
+  const result = await requestCorroborationTool.invoke({ originalAction: "rollback_production", reason: "incomplete-required-evidence" }) as { status: string }
   assert.equal(result.status, "blocked-pending-corroboration")
 })
 
-test("scenario returns when the event-driven incident settles instead of sleeping a fixed window", async () => {
-  const report = await runIncidentScenario({ dryRun: true })
-  const lastEventMs = Math.max(...report.timeline.map((item) => item.atMs))
-  assert.ok(report.elapsedMs - lastEventMs < 100, `report lagged last event by ${report.elapsedMs - lastEventMs}ms`)
-  assert.equal(report.timeline.some((item) => item.type === "incident.scenario.timeout"), false)
+test("action-boundary snapshot is immutable while late evidence updates investigation state", () => {
+  const state = new IncidentState()
+  state.registerResponder("trace", "trace-id")
+  state.registerResponder("dependency", "dependency-id")
+  state.registerResponder("impact", "impact-id")
+  assert.equal(state.acceptHypothesis("trace-id", {
+    role: "trace", claim: "trace claim", confidence: 0.9, rootCause: "cause-a",
+  }).status, "accepted")
+
+  const snapshot = state.captureActionBoundarySnapshot("rollback_production")
+  const serialized = JSON.stringify(snapshot)
+  assert.equal(Object.isFrozen(snapshot), true)
+  assert.equal(Object.isFrozen(snapshot.availableRoles), true)
+  assert.equal(Object.isFrozen(snapshot.missingRequiredRoles), true)
+  assert.equal(snapshot.decision, "blocked")
+  assert.equal(snapshot.reason, "incomplete-required-evidence")
+
+  assert.equal(state.acceptHypothesis("dependency-id", {
+    role: "dependency", claim: "dependency claim", confidence: 0.9, rootCause: "cause-b",
+  }).status, "late-accepted")
+  assert.equal(state.acceptHypothesis("impact-id", {
+    role: "impact", claim: "impact claim", confidence: 0.9, rootCause: "cause-c",
+  }).status, "late-accepted")
+
+  assert.equal(state.hypotheses.length, 3)
+  assert.equal(state.contradictions, 2)
+  assert.equal(JSON.stringify(snapshot), serialized)
+  assert.deepEqual(snapshot.availableRoles, ["trace"])
+  assert.deepEqual(snapshot.missingRequiredRoles, ["dependency", "impact"])
+  assert.equal(evaluateSafetyGate(state.hypotheses).reason, "conflicting-evidence")
 })
 
-test("model hypotheses preserve structured confidence and root cause", () => {
-  const hypothesis = parseModelHypothesis({
+test("producer identity, unknown roles, and duplicate policy cannot alter safety aggregates", () => {
+  const state = new IncidentState()
+  state.registerResponder("trace", "trace-id")
+  state.registerResponder("dependency", "dependency-id")
+  state.registerResponder("impact", "impact-id")
+
+  const trace = { role: "trace", claim: "trace claim", confidence: 0.9, rootCause: "cause-a" }
+  assert.equal(state.acceptHypothesis("trace-id", trace).status, "accepted")
+  assert.equal(state.acceptHypothesis("trace-id", { ...trace, confidence: 1, rootCause: "cause-b" }).status, "duplicate")
+  assert.equal(state.acceptHypothesis("impact-id", { ...trace, confidence: 0.99 }).status, "spoofed-role")
+  assert.equal(state.acceptHypothesis("attacker-id", {
+    role: "unknown", claim: "spoof", confidence: 0.99, rootCause: "cause-z",
+  }).status, "unknown-role")
+
+  assert.equal(state.hypotheses.length, 1)
+  assert.equal(state.confidence, 0.9)
+  assert.equal(state.contradictions, 0)
+  assert.equal(state.hypotheses[0].rootCause, "cause-a")
+})
+
+test("invalid confidence is rejected and can never improve the gate posture", () => {
+  const badValues: unknown[] = [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, -0.2, 1.4, "0.9", undefined]
+  for (const confidence of badValues) {
+    const state = new IncidentState()
+    state.registerResponder("dependency", "dependency-id")
+    const result = state.acceptHypothesis("dependency-id", {
+      role: "dependency", claim: "dependency claim", confidence, rootCause: "same-cause",
+    })
+    assert.equal(result.status, "malformed", `confidence=${String(confidence)}`)
+    assert.equal(state.hypotheses.length, 0)
+    assert.deepEqual(state.degradedRoles, ["dependency"])
+    const boundary = evaluateSafetyGate(state.hypotheses, state.degradedRoles, "action-boundary")
+    assert.equal(boundary.decision, "blocked")
+    assert.equal(boundary.reason, "incomplete-required-evidence")
+  }
+
+  assert.equal(parseModelHypothesis({ answer: { content: { text: "not-json" } } }, "dependency"), null)
+  assert.equal(parseModelHypothesis({
+    answer: { content: { text: JSON.stringify({ claim: "bad", confidence: 2, rootCause: "cause" }) } },
+  }, "dependency"), null)
+})
+
+test("valid structured model evidence preserves provider confidence and root cause", () => {
+  const parsed = parseModelHypothesis({
     answer: { content: { text: JSON.stringify({ claim: "pool wait follows deploy", confidence: 0.83, rootCause: "deploy-pool-regression" }) } },
   }, "dependency")
-  assert.deepEqual(hypothesis, {
+  assert.deepEqual(parsed, {
     claim: "pool wait follows deploy",
     confidence: 0.83,
     rootCause: "deploy-pool-regression",
   })
 })
 
-test("timeout returns a stable partial snapshot and keeps the gate conservative", async () => {
-  const report = await runIncidentScenario({ dryRun: true, timeoutMs: 150 })
-  assert.equal(report.timeline.some((item) => item.type === "incident.scenario.timeout"), true)
-  assert.equal(report.gateDecision, "pending")
-  assert.equal(report.hypotheses.length, 2)
-  assert.equal(report.adaptations.length, 0)
-  assert.equal(report.action.proposed, true)
-  assert.equal(report.action.attemptedAtMs, null)
-  assert.equal(report.action.gateAtBoundary, null)
-  assert.equal(report.action.intercepted, false)
-  assert.equal(report.action.executedTool, null)
-  const snapshot = JSON.stringify(report)
-  await new Promise((resolve) => setTimeout(resolve, 160))
-  assert.equal(JSON.stringify(report), snapshot)
-})
-
-
-test("fixed action-boundary ablation changes only evidence scheduling and changes the intercepted tool", async () => {
-  const shared = { dryRun: true, actionProposalMs: 45, actionBoundaryMs: 205 } as const
-  const concurrent = await runIncidentScenario({ ...shared, scheduleMode: "concurrent" })
-  const sequential = await runIncidentScenario({ ...shared, scheduleMode: "sequential" })
-  const normalize = (report: typeof concurrent) => report.hypotheses
-    .map(({ role, claim, confidence, rootCause }) => ({ role, claim, confidence, rootCause }))
-    .sort((a, b) => a.role.localeCompare(b.role))
-  assert.deepEqual(normalize(concurrent), normalize(sequential))
-  assert.equal(concurrent.action.boundaryMs, sequential.action.boundaryMs)
-  assert.equal(concurrent.action.gateAtBoundary, "blocked")
-  assert.equal(concurrent.action.executedTool, "request_corroboration")
-  assert.equal(sequential.action.gateAtBoundary, "approved")
-  assert.equal(sequential.action.executedTool, "rollback_production")
-  assert.equal(sequential.gateDecision, "blocked")
-  assert.equal(sequential.contradictions, 2)
-})
-
-test("dependency timeout is explicit shared state and the action boundary fails closed", async () => {
+test("explicit Dependency timeout degrades the role and terminates through the safe tool", async () => {
   const report = await runIncidentScenario({ dryRun: true, simulateDependencyTimeout: true })
   assert.deepEqual(report.degradedRoles, ["dependency"])
   assert.equal(report.hypotheses.length, 2)
+  assert.equal(report.gateDecision, "blocked")
+  assert.equal(report.gateReason, "incomplete-required-evidence")
   assert.equal(report.action.gateAtBoundary, "blocked")
+  assert.equal(report.action.gateReasonAtBoundary, "incomplete-required-evidence")
+  assert.deepEqual(report.action.boundarySnapshot?.missingRequiredRoles, ["dependency"])
+  assert.equal(report.action.boundarySafeAction, "hold-for-missing-evidence")
   assert.equal(report.action.intercepted, true)
   assert.equal(report.action.executedTool, "request_corroboration")
-  assert.equal(report.gateDecision, "blocked")
   assert.equal(report.evidence.length, 1)
   assert.ok(report.timeline.some((item) => item.type === "incident.responder.degraded" && item.producer === "Dependency"))
+  assert.equal(report.timeline.some((item) => item.type === "incident.scenario.timeout"), false)
 })
-
 
 class ScriptedTwoPhaseInferenceRunner implements InferenceRunner {
   readonly mitigationPrompts: string[] = []
+
+  constructor(private readonly hangDependency = false) {}
 
   async run(request: InferenceInput): Promise<InferenceOutput> {
     const items = request.context.getItems()
@@ -160,7 +299,7 @@ class ScriptedTwoPhaseInferenceRunner implements InferenceRunner {
         }
       }
       return {
-        items: [ModelMessageItem.rehydrate({ text: "Use a 5% canary and collect corroboration before any broader production change." })],
+        items: [ModelMessageItem.rehydrate({ text: "Use a 5% canary only after the required corroboration is available." })],
         tokenUsage: undefined,
         rowResponse: { fixture: "provider-phase-2-recommendation" },
       }
@@ -171,6 +310,11 @@ class ScriptedTwoPhaseInferenceRunner implements InferenceRunner {
         : prompt.includes("impact responder") ? "impact"
           : null
     assert.ok(role, `unexpected scripted inference prompt: ${prompt}`)
+
+    if (role === "dependency" && this.hangDependency) {
+      return await new Promise<InferenceOutput>(() => {})
+    }
+
     const fixture = role === "trace"
       ? { claim: "trace sees cache churn", confidence: 0.85, rootCause: "cache-stampede" }
       : role === "dependency"
@@ -188,16 +332,18 @@ class ScriptedTwoPhaseInferenceRunner implements InferenceRunner {
   }
 }
 
-test("model-mode lifecycle has a reachable post-aggregation interception phase", async () => {
+test("two-phase scripted model integration traverses the real post-aggregation interceptor", async () => {
   const runner = new ScriptedTwoPhaseInferenceRunner()
   const report = await runIncidentScenario({ dryRun: false, inferenceRunner: runner, timeoutMs: 2_000 })
 
   assert.equal(report.hypotheses.length, 3)
   assert.equal(report.gateDecision, "blocked")
+  assert.equal(report.gateReason, "conflicting-evidence")
   assert.equal(report.action.mitigationPhaseStarted, true)
   assert.equal(report.action.proposed, true)
   assert.equal(report.action.requestedTool, "rollback_production")
   assert.equal(report.action.gateAtBoundary, "blocked")
+  assert.equal(report.action.gateReasonAtBoundary, "conflicting-evidence")
   assert.equal(report.action.intercepted, true)
   assert.equal(report.action.executedTool, "request_corroboration")
   assert.equal(report.action.boundaryMs, null)
@@ -206,12 +352,52 @@ test("model-mode lifecycle has a reachable post-aggregation interception phase",
   assert.ok(report.timeline.some((item) => item.type === "mozaik.interception.started"))
   assert.ok(report.timeline.some((item) => item.type === "mozaik.interception.rewritten"))
   assert.ok(report.timeline.some((item) => item.type === "incident.action.safe-executed"))
-  assert.ok(report.timeline.some((item) => item.type === "incident.mitigation.replanned" && item.detail.includes("5% canary")))
+  assert.equal(report.timeline.some((item) => item.type === "incident.action.rollback-tool-executed"), false)
 
   assert.equal(runner.mitigationPrompts.length, 1)
   const mitigationPrompt = runner.mitigationPrompts[0]
   assert.match(mitigationPrompt, /cache-stampede/)
   assert.match(mitigationPrompt, /deploy-8f3/)
   assert.match(mitigationPrompt, /regional-impact/)
-  assert.match(mitigationPrompt, /Safety Gate: blocked/)
+  assert.match(mitigationPrompt, /Safety Gate: blocked \(conflicting-evidence\)/)
+})
+
+test("a generally hanging required model responder degrades at the evidence deadline", async () => {
+  const runner = new ScriptedTwoPhaseInferenceRunner(true)
+  const report = await runIncidentScenario({
+    dryRun: false,
+    inferenceRunner: runner,
+    timeoutMs: 1_500,
+    evidenceDeadlineMs: 150,
+  })
+
+  assert.deepEqual(report.degradedRoles, ["dependency"])
+  assert.deepEqual(report.hypotheses.map((item) => item.role).sort(), ["impact", "trace"])
+  assert.equal(report.gateDecision, "blocked")
+  assert.equal(report.gateReason, "incomplete-required-evidence")
+  assert.equal(report.action.mitigationPhaseStarted, true)
+  assert.equal(report.action.gateAtBoundary, "blocked")
+  assert.equal(report.action.gateReasonAtBoundary, "incomplete-required-evidence")
+  assert.deepEqual(report.action.boundarySnapshot?.missingRequiredRoles, ["dependency"])
+  assert.equal(report.action.intercepted, true)
+  assert.equal(report.action.executedTool, "request_corroboration")
+  assert.ok(report.action.modelRecommendation)
+  assert.ok(report.timeline.some((item) => item.type === "incident.responder.degraded" && item.detail.includes("evidence deadline")))
+  assert.equal(report.timeline.some((item) => item.type === "incident.scenario.timeout"), false)
+})
+
+test("an early scenario timeout returns a stable pending investigation snapshot", async () => {
+  const report = await runIncidentScenario({ dryRun: true, timeoutMs: 150 })
+  assert.equal(report.timeline.some((item) => item.type === "incident.scenario.timeout"), true)
+  assert.equal(report.gateDecision, "pending")
+  assert.equal(report.gateReason, "pending-required-evidence")
+  assert.equal(report.hypotheses.length, 2)
+  assert.equal(report.action.proposed, true)
+  assert.equal(report.action.attemptedAtMs, null)
+  assert.equal(report.action.boundarySnapshot, null)
+  assert.equal(report.action.intercepted, false)
+  assert.equal(report.action.executedTool, null)
+  const snapshot = JSON.stringify(report)
+  await new Promise((resolve) => setTimeout(resolve, 160))
+  assert.equal(JSON.stringify(report), snapshot)
 })

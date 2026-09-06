@@ -36,12 +36,12 @@ The deterministic demo traverses the real Mozaik interception and function-call 
 
 ## Causal concurrency evidence
 
-`npm run ablation` holds the incident, evidence, confidence values, safety rule, proposed rollback, and fixed 205 ms action boundary constant. Only evidence scheduling differs.
+`npm run ablation` holds the incident, evidence, confidence values, safety rule, proposed rollback, and configured 205 ms action-boundary timer constant. Only evidence scheduling differs.
 
-- Concurrent: 3 hypotheses / 2 contradictions are available by the boundary → `BLOCKED` → Mozaik interception → `request_corroboration`.
-- Sequential: only Trace evidence is available by the same boundary → `APPROVED` → no interception → proposal-only `rollback_production`; the same contradictory evidence arrives later and changes the final gate to `BLOCKED`, too late to retroactively intercept that call.
+- Concurrent: all 3 required hypotheses / 2 contradictions are available by the boundary → `BLOCKED — conflicting-evidence` → Mozaik interception → `request_corroboration` → canary + targeted corroboration is actionable immediately.
+- Sequential: only Trace evidence is available by the same boundary → `BLOCKED — incomplete-required-evidence` → the same Mozaik interception → `request_corroboration` → hold for missing evidence; the identical later evidence eventually reveals the same conflict and enables the canary plan later.
 
-This is a control-flow ablation, not a claim that a real production rollback was executed.
+No arm authorizes production from incomplete evidence. The ablation demonstrates that concurrency changes the safe control path available at the action boundary, not merely wall time. It also reports time to actionable safe mitigation; that deterministic fixture metric is not MTTR or a production-speedup claim.
 
 ## Supporting overlap metric
 
@@ -59,9 +59,10 @@ It is roughly 2.3× in the deterministic fixture. It is not a claim about reason
 - three independent concurrent responders with 3 / 3 measured pairwise overlap
 - runtime peer observations while responder work is active; no claim that Phase-1 model contexts see peer hypotheses
 - shared typed state and semantic event fan-out
-- aggregate disagreement driving the Safety Gate
-- canonical blocked gate driving deterministic Impact canary replanning
+- evolving investigation state plus an immutable fail-closed action-boundary decision
+- producer-role binding, finite `[0,1]` confidence validation, duplicate-role protection, and late-evidence snapshot immutability
+- canonical conflicting-evidence block driving deterministic Impact canary replanning
 - replanned event driving two peer corroboration responses
-- canonical end-to-end Mozaik rollback interception plus focused interception tests
+- canonical and incomplete-evidence end-to-end Mozaik rollback interception; rollback passes only on affirmative approval
 - two-phase model-mode lifecycle test: aggregate evidence → Phase-2 Action Controller → real interceptor → safe tool → follow-up model recommendation
-- tests, production build, built smoke verification, and GitHub Actions CI
+- 15 focused invariant tests, production build, built smoke verification, and GitHub Actions CI

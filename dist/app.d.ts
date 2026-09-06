@@ -3,6 +3,7 @@ import type { ExecutableTransition, InferenceRunner, InterceptionHandler, Tool }
 export declare const INCIDENT_OPENED = "incident.opened";
 export declare const SPAN_STARTED = "incident.span.started";
 export declare const HYPOTHESIS_EMITTED = "incident.hypothesis.emitted";
+export declare const HYPOTHESIS_REJECTED = "incident.hypothesis.rejected";
 export declare const SPAN_COMPLETED = "incident.span.completed";
 export declare const GATE_DECISION = "incident.gate.decision";
 export declare const MITIGATION_REPLANNED = "incident.mitigation.replanned";
@@ -15,6 +16,31 @@ export declare const MITIGATION_PHASE_STARTED = "incident.mitigation.phase-start
 export declare const ROLES: readonly ["trace", "dependency", "impact"];
 export type Role = (typeof ROLES)[number];
 export type ScheduleMode = "concurrent" | "sequential";
+export type GateDecision = "blocked" | "approved" | "pending";
+export type GateReason = "pending-required-evidence" | "incomplete-required-evidence" | "conflicting-evidence" | "low-confidence-evidence" | "sufficient-consistent-evidence";
+export type BoundarySafeAction = "rollback-approved" | "canary-with-targeted-corroboration" | "hold-for-missing-evidence" | "request-broader-corroboration";
+export type GateEvaluation = {
+    decision: GateDecision;
+    reason: GateReason;
+    confidence: number;
+    contradictions: number;
+    availableRoles: Role[];
+    missingRequiredRoles: Role[];
+};
+export type ActionBoundarySnapshot = Readonly<{
+    atMs: number;
+    investigationDecision: GateDecision;
+    investigationReason: GateReason;
+    decision: Exclude<GateDecision, "pending">;
+    reason: Exclude<GateReason, "pending-required-evidence">;
+    availableRoles: readonly Role[];
+    missingRequiredRoles: readonly Role[];
+    degradedRoles: readonly Role[];
+    confidence: number;
+    contradictions: number;
+    proposedAction: "rollback_production";
+}>;
+export type HypothesisAcceptanceStatus = "accepted" | "late-accepted" | "duplicate" | "spoofed-role" | "unknown-role" | "malformed";
 export type Hypothesis = {
     role: Role;
     claim: string;
@@ -38,7 +64,8 @@ export type IncidentReport = {
     incident: string;
     scheduleMode: ScheduleMode;
     phase: "contained" | "investigating";
-    gateDecision: "blocked" | "approved" | "pending";
+    gateDecision: GateDecision;
+    gateReason: GateReason;
     confidence: number;
     contradictions: number;
     hypotheses: Hypothesis[];
@@ -50,9 +77,14 @@ export type IncidentReport = {
         requestedTool: "rollback_production" | null;
         boundaryMs: number | null;
         attemptedAtMs: number | null;
-        gateAtBoundary: "blocked" | "approved" | "pending" | null;
+        gateAtBoundary: GateDecision | null;
+        gateReasonAtBoundary: GateReason | null;
         hypothesesAtBoundary: number;
         contradictionsAtBoundary: number;
+        boundarySnapshot: ActionBoundarySnapshot | null;
+        boundarySafeAction: BoundarySafeAction | null;
+        actionableSafePlan: "canary-with-targeted-corroboration" | null;
+        actionableSafePlanAtMs: number | null;
         intercepted: boolean;
         executedTool: "rollback_production" | "request_corroboration" | null;
         mitigationPhaseStarted: boolean;
@@ -72,18 +104,26 @@ export declare class IncidentState extends RuntimeState {
     readonly spans: Map<"trace" | "dependency" | "impact", Span>;
     readonly timeline: TimelineEvent[];
     scheduleMode: ScheduleMode;
-    gateDecision: IncidentReport["gateDecision"];
+    gateDecision: GateDecision;
+    gateReason: GateReason;
     confidence: number;
     contradictions: number;
     followupRequested: boolean;
+    holdPlanRecorded: boolean;
+    private readonly responderIds;
     actionProposed: boolean;
     actionAttemptStarted: boolean;
     actionBoundaryMs: number | null;
     requestedActionTool: "rollback_production" | null;
     actionAttemptedAtMs: number | null;
-    gateAtActionBoundary: IncidentReport["gateDecision"] | null;
+    gateAtActionBoundary: GateDecision | null;
+    gateReasonAtActionBoundary: GateReason | null;
     hypothesesAtActionBoundary: number;
     contradictionsAtActionBoundary: number;
+    actionBoundarySnapshot: ActionBoundarySnapshot | null;
+    boundarySafeAction: BoundarySafeAction | null;
+    actionableSafePlan: "canary-with-targeted-corroboration" | null;
+    actionableSafePlanAtMs: number | null;
     actionIntercepted: boolean;
     actionExecutedTool: "rollback_production" | "request_corroboration" | null;
     mitigationPhaseStarted: boolean;
@@ -91,10 +131,20 @@ export declare class IncidentState extends RuntimeState {
     onTrace?: (event: TimelineEvent) => void;
     private readonly changeListeners;
     private notifyChange;
+    registerResponder(role: Role, participantId: string): void;
+    markDegraded(role: Role): boolean;
+    private recalculateAggregate;
+    acceptHypothesis(producerId: string, payload: EventPayload): {
+        status: HypothesisAcceptanceStatus;
+        role?: Role;
+    };
+    captureActionBoundarySnapshot(proposedAction: "rollback_production"): ActionBoundarySnapshot;
+    markActionableCanaryAvailable(): void;
     waitFor(predicate: () => boolean, timeoutMs: number): Promise<boolean>;
     record(type: string, producer: string, detail: string): void;
     toReport(): IncidentReport;
 }
+type EventPayload = Record<string, unknown>;
 type CorroborationArgs = {
     originalAction: string;
     reason: string;
@@ -108,7 +158,8 @@ export declare class SafetyGateInterception implements InterceptionHandler {
     handle(transition: ExecutableTransition): Promise<ExecutableTransition>;
 }
 type ModelHypothesis = Pick<Hypothesis, "claim" | "confidence" | "rootCause">;
-export declare function parseModelHypothesis(payload: unknown, role: Role): ModelHypothesis;
+export declare function parseModelHypothesis(payload: unknown, _role: Role): ModelHypothesis | null;
+export declare function evaluateSafetyGate(hypotheses: readonly Hypothesis[], degradedRoles?: readonly Role[], scope?: "investigation" | "action-boundary"): GateEvaluation;
 export type ScenarioOptions = {
     dryRun?: boolean;
     model?: string;
@@ -118,6 +169,7 @@ export type ScenarioOptions = {
     actionProposalMs?: number;
     actionBoundaryMs?: number;
     simulateDependencyTimeout?: boolean;
+    evidenceDeadlineMs?: number;
     inferenceRunner?: InferenceRunner;
     trace?: (event: TimelineEvent) => void;
 };

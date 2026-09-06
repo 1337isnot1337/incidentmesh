@@ -4,6 +4,7 @@
   "scheduleMode": "concurrent",
   "phase": "contained",
   "gateDecision": "blocked",
+  "gateReason": "conflicting-evidence",
   "confidence": 0.85,
   "contradictions": 2,
   "hypotheses": [
@@ -12,7 +13,7 @@
       "claim": "p95 latency jumped on checkout requests before the error spike",
       "confidence": 0.85,
       "rootCause": "cache-stampede",
-      "atMs": 83
+      "atMs": 82
     },
     {
       "role": "dependency",
@@ -34,17 +35,38 @@
     "Dependency supplied corroboration for the canary plan"
   ],
   "adaptations": [
-    "Impact changed the plan after Safety Gate blocked an uncorroborated rollback."
+    "Impact selected a canary with targeted corroboration after conflicting evidence blocked rollback."
   ],
   "degradedRoles": [],
   "action": {
     "proposed": true,
     "requestedTool": "rollback_production",
     "boundaryMs": 205,
-    "attemptedAtMs": 209,
+    "attemptedAtMs": 208,
     "gateAtBoundary": "blocked",
+    "gateReasonAtBoundary": "conflicting-evidence",
     "hypothesesAtBoundary": 3,
     "contradictionsAtBoundary": 2,
+    "boundarySnapshot": {
+      "atMs": 208,
+      "investigationDecision": "blocked",
+      "investigationReason": "conflicting-evidence",
+      "decision": "blocked",
+      "reason": "conflicting-evidence",
+      "availableRoles": [
+        "trace",
+        "dependency",
+        "impact"
+      ],
+      "missingRequiredRoles": [],
+      "degradedRoles": [],
+      "confidence": 0.85,
+      "contradictions": 2,
+      "proposedAction": "rollback_production"
+    },
+    "boundarySafeAction": "canary-with-targeted-corroboration",
+    "actionableSafePlan": "canary-with-targeted-corroboration",
+    "actionableSafePlanAtMs": 208,
     "intercepted": true,
     "executedTool": "request_corroboration",
     "mitigationPhaseStarted": false,
@@ -54,22 +76,22 @@
     {
       "role": "trace",
       "startedAtMs": 2,
-      "completedAtMs": 121
+      "completedAtMs": 120
     },
     {
       "role": "dependency",
-      "startedAtMs": 3,
+      "startedAtMs": 2,
       "completedAtMs": 171
     },
     {
       "role": "impact",
-      "startedAtMs": 3,
+      "startedAtMs": 2,
       "completedAtMs": 221
     }
   ],
   "timeline": [
     {
-      "atMs": 2,
+      "atMs": 1,
       "type": "incident.opened",
       "producer": "Incident Commander",
       "detail": "incident.opened"
@@ -81,43 +103,43 @@
       "detail": "trace started concurrent investigation"
     },
     {
-      "atMs": 3,
+      "atMs": 2,
       "type": "incident.span.started",
       "producer": "Dependency",
       "detail": "dependency started concurrent investigation"
     },
     {
-      "atMs": 3,
+      "atMs": 2,
       "type": "incident.span.started",
       "producer": "Impact",
       "detail": "impact started concurrent investigation"
     },
     {
-      "atMs": 49,
+      "atMs": 47,
       "type": "incident.action.proposed",
       "producer": "Action Controller",
       "detail": "rollback_production is pending; fixed action boundary is 205ms"
     },
     {
-      "atMs": 83,
+      "atMs": 82,
       "type": "incident.hypothesis.emitted",
       "producer": "Trace",
       "detail": "p95 latency jumped on checkout requests before the error spike"
     },
     {
-      "atMs": 83,
+      "atMs": 82,
       "type": "awareness.peer-observed",
       "producer": "Dependency",
       "detail": "Dependency observed trace hypothesis"
     },
     {
-      "atMs": 83,
+      "atMs": 82,
       "type": "awareness.peer-observed",
       "producer": "Impact",
       "detail": "Impact observed trace hypothesis"
     },
     {
-      "atMs": 121,
+      "atMs": 120,
       "type": "incident.span.completed",
       "producer": "Trace",
       "detail": "independent pass complete"
@@ -154,6 +176,12 @@
     },
     {
       "atMs": 182,
+      "type": "incident.gate.decision",
+      "producer": "Safety Gate",
+      "detail": "blocked: conflicting-evidence; 2 contradictions across 3 hypotheses; confidence 0.85 (evidence-aggregation)"
+    },
+    {
+      "atMs": 182,
       "type": "awareness.peer-observed",
       "producer": "Trace",
       "detail": "Trace observed impact hypothesis"
@@ -165,49 +193,49 @@
       "detail": "Dependency observed impact hypothesis"
     },
     {
-      "atMs": 209,
+      "atMs": 208,
       "type": "incident.action.execution-requested",
       "producer": "Action Controller",
       "detail": "action boundary reached with hypotheses=3, contradictions=2"
     },
     {
-      "atMs": 209,
+      "atMs": 208,
       "type": "incident.gate.decision",
       "producer": "Safety Gate",
-      "detail": "blocked: 2 contradictions across 3 root-cause hypotheses; confidence 0.85 (action-boundary)"
+      "detail": "blocked: conflicting-evidence; boundary hypotheses=3, missing=none"
     },
     {
-      "atMs": 212,
+      "atMs": 210,
       "type": "mozaik.interception.started",
       "producer": "Action Controller",
       "detail": "InterceptionHandler received rollback_production"
     },
     {
-      "atMs": 212,
+      "atMs": 210,
       "type": "mozaik.interception.rewritten",
       "producer": "Safety Gate",
-      "detail": "rewrote rollback_production -> request_corroboration"
+      "detail": "rewrote rollback_production -> request_corroboration (conflicting-evidence)"
     },
     {
-      "atMs": 212,
+      "atMs": 210,
       "type": "mozaik.interception.finished",
       "producer": "Action Controller",
       "detail": "InterceptionHandler returned request_corroboration"
     },
     {
-      "atMs": 212,
+      "atMs": 210,
       "type": "mozaik.function-call.started",
       "producer": "Action Controller",
       "detail": "Mozaik executing request_corroboration"
     },
     {
-      "atMs": 212,
+      "atMs": 210,
       "type": "incident.action.safe-executed",
       "producer": "Action Controller",
       "detail": "safe tool executed for blocked rollback_production"
     },
     {
-      "atMs": 212,
+      "atMs": 210,
       "type": "mozaik.function-call.completed",
       "producer": "Action Controller",
       "detail": "Mozaik function tool completed"
@@ -222,20 +250,20 @@
       "atMs": 243,
       "type": "incident.mitigation.replanned",
       "producer": "Impact",
-      "detail": "switched from rollback to a canary plus corroboration"
+      "detail": "switched from rollback to a canary plus targeted corroboration"
     },
     {
-      "atMs": 268,
+      "atMs": 267,
       "type": "incident.evidence.added",
       "producer": "Trace",
       "detail": "Trace supplied corroboration for the canary plan"
     },
     {
-      "atMs": 286,
+      "atMs": 285,
       "type": "incident.evidence.added",
       "producer": "Dependency",
       "detail": "Dependency supplied corroboration for the canary plan"
     }
   ],
-  "elapsedMs": 287
+  "elapsedMs": 286
 }

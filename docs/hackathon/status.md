@@ -15,9 +15,9 @@ JIGJOY_STATUS=SUBMISSION_READY
 - Provider evidence tooling: safe-by-default check plus explicit bounded capture; staged evidence is secret/path-scanned before repository copy. No real-provider evidence is currently committed.
 - Provider failure behavior: model-mode CLI preflight rejects missing credentials before loops start; later inference rejection terminates the CLI nonzero because Mozaik 4.0.5 `runLoop` does not expose its Promise.
 - Completion: the scenario waits for observable incident state instead of a fixed sleep, records a timeout if the run does not settle, and returns stable snapshots that do not mutate after return.
-- Causal ablation: same incident/evidence/confidence values/gate rule/rollback proposal/205 ms boundary; concurrent scheduling blocks and rewrites to `request_corroboration`, sequential scheduling lets the proposal-only rollback call cross before identical late evidence tightens the final gate.
-- Degradation: Dependency timeout is explicit shared state; the gate fails closed, rollback remains intercepted, and surviving responders continue.
-- Tests: twelve focused tests plus strict typecheck, production build, and built smoke verification, including the scripted two-phase model lifecycle and provider credential preflight.
+- Causal ablation: same incident/evidence/confidence values/gate rule/rollback proposal/configured 205 ms boundary; both arms fail closed and execute `request_corroboration`, while concurrent scheduling has complete conflicting evidence and can select the canary path at the boundary and sequential scheduling must hold for missing evidence until the same conflict arrives later.
+- Degradation: explicit or generally hanging required responders become degraded at the evidence deadline; incomplete required evidence fails closed at the action boundary, rollback remains intercepted, and surviving responders continue.
+- Tests: fifteen focused invariant tests plus strict typecheck, production build, and built smoke verification, including pending-action fail-closed behavior, immutable boundary snapshots, role/confidence validation, hanging-responder degradation, causal scheduling, the scripted two-phase model lifecycle, and provider credential preflight.
 - Overlap metric: representative deterministic runs measure ~220 ms concurrent wall time and ~505–508 ms summed responder durations, producing an approximately 2.3× latency/overlap proxy. It does not measure reasoning quality, throughput, MTTR, or production performance.
 - Replay surface: `npm run replay:visual` generates SVG + JSON from the canonical report for a submission-video timeline.
 - Presentation: product-first README, causal hero, repository-owned social-preview asset, explicit limitations, concise architecture, and CI workflow.
@@ -26,4 +26,4 @@ JIGJOY_STATUS=SUBMISSION_READY
 
 Remaining competitive gap: no sanitized authenticated provider evidence has been captured yet.
 
-Remaining optional presentation item: export `docs/assets/social-preview.svg` to a GitHub-supported social-preview bitmap and upload it through repository settings if desired.
+Remaining optional presentation item: upload the repository-ready `docs/assets/social-preview.png` through GitHub repository settings.

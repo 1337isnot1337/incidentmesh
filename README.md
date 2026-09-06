@@ -18,7 +18,7 @@ Independent responders share evidence that can change a production-action propos
 
 ## Why IncidentMesh?
 
-Trace, Dependency, and Impact investigate concurrently and share their findings while peers are still working. The Safety Gate uses that evidence to decide whether a pending rollback may proceed. **Parallel work changes the action, not just the time it takes.**
+Trace, Dependency, and Impact investigate concurrently and share their findings while peers are still working. The Safety Gate uses that evidence to decide what a pending rollback may safely do at the action boundary. **Parallel work changes the safe plan available at the boundary, not just the time it takes.**
 
 The default demo uses deterministic evidence and Mozaik's real function-call loop. Action tools are proposal-only; no production infrastructure is changed.
 
@@ -37,20 +37,25 @@ npm run demo
 
 ## Causal concurrency ablation
 
-**Same evidence. Same policy. Different action at the boundary.**
+**Same evidence. Same policy. Different safe plan at the boundary.**
 
 `npm run ablation` changes only evidence scheduling. The incident, three evidence items, confidence values, gate rule, proposed action, and configured 205 ms action-boundary timer stay constant.
 
 | At the action boundary | Concurrent | Sequential |
 | --- | --- | --- |
-| Available hypotheses / contradictions | 3 / 2 | 1 / 0 |
-| Gate decision | **BLOCKED** | **APPROVED** |
-| Mozaik intercepts rollback | Yes | No |
-| Tool executed | `request_corroboration` | `rollback_production` |
+| Required hypotheses available | 3 | 1 |
+| Missing required roles | none | Dependency, Impact |
+| Contradictions visible | 2 | 0 |
+| Boundary decision | **BLOCKED** | **BLOCKED** |
+| Boundary reason | `conflicting-evidence` | `incomplete-required-evidence` |
+| Mozaik intercepts rollback | Yes | Yes |
+| Tool executed | `request_corroboration` | `request_corroboration` |
+| Safe control path | canary + targeted corroboration | hold for missing evidence |
+| Conflict-informed canary | available at the boundary | available only after remaining evidence arrives |
 
-Both schedules eventually reach the **same three hypotheses, two contradictions, and blocked gate**. In the sequential case, the contradictory evidence arrives after the action has crossed the boundary. The rollback tool is proposal-only; this is a demonstrated control-flow escape, not a real production rollback.
+Both schedules eventually reach the **same three hypotheses, two contradictions, and `BLOCKED — conflicting-evidence` investigation state**. No arm authorizes production from incomplete evidence. Parallel scheduling makes the conflict visible early enough to select the targeted canary path immediately; serialized scheduling leaves required evidence missing, so the same fail-closed policy holds the rollback until the conflict becomes visible later.
 
-The 205 ms value is a configured JavaScript timer, not a hard real-time guarantee. Host scheduling may delay the callback; `action.attemptedAtMs` records its observed time. The causal separation comes from the interval between evidence arrivals in the two schedules, not one exact timer tick.
+`npm run ablation` also reports **time to actionable safe mitigation**: approximately the action boundary for the concurrent fixture and roughly 460–470 ms for the sequential fixture in verified runs. This is a deterministic fixture latency, **not MTTR and not a production-speedup claim**. The 205 ms boundary is a configured JavaScript timer; host scheduling may delay the callback, and `action.attemptedAtMs` records the observed time.
 
 ## Demo
 
@@ -70,8 +75,8 @@ Timing varies by machine and scheduler load. The canonical fixture produces thre
 
 1. **Investigate together.** One `incident.opened` event wakes Trace, Dependency, and Impact. Each has independent handlers and a lifecycle.
 2. **Share evidence as it arrives.** Typed hypotheses enter `IncidentState`; runtime handlers observe peer findings while investigations remain active.
-3. **Evaluate at the boundary.** The Safety Gate aggregates confidence and root-cause disagreement from the evidence available when the callback runs.
-4. **Intercept and adapt.** When blocked, `SafetyGateInterception` rewrites `rollback_production` to `request_corroboration`. Mozaik executes that tool; deterministic application logic then replans to a canary and requests follow-up evidence.
+3. **Separate investigation from action safety.** Evidence can remain `PENDING` while responders are still working, but rollback may cross the action boundary only on an affirmative `APPROVED`. Missing required evidence becomes `BLOCKED — incomplete-required-evidence`; complete disagreement becomes `BLOCKED — conflicting-evidence`.
+4. **Intercept and adapt.** On either blocked path, `SafetyGateInterception` rewrites `rollback_production` to `request_corroboration`. Complete conflicting evidence can select a canary + targeted corroboration immediately; incomplete evidence conservatively holds for the missing signal.
 
 Built directly on **Mozaik 4.0.5**: typed runtime state, independent participants, semantic events, situation handlers, and function-call interception.
 
@@ -79,9 +84,11 @@ Built directly on **Mozaik 4.0.5**: typed runtime state, independent participant
 
 ## Safety and degradation
 
-`npm run degradation` makes Dependency time out before publishing a hypothesis. That failure becomes explicit shared state before the action boundary. The gate fails closed, rollback is intercepted, and the surviving responders continue with a canary plan and Trace corroboration.
+Rollback is fail-closed at the action boundary: **only an affirmative `APPROVED` decision may pass `rollback_production`**. Investigation state may legitimately remain `PENDING` while responders are still working, but if required evidence is still missing when the action is attempted, the immutable boundary snapshot records `BLOCKED — incomplete-required-evidence` and Mozaik rewrites the rollback to `request_corroboration`. Late evidence can update the investigation, but it cannot rewrite that historical boundary decision.
 
-This guarantee applies to **known degradation recorded before evaluation**. Evidence that has merely not arrived is evaluated under the normal available-evidence policy—as the sequential ablation shows. There is no claim of generic missing-evidence safety or dynamic-agent recovery.
+`npm run degradation` makes Dependency miss its evidence deadline. Trace and Impact continue, Dependency becomes explicitly degraded, the boundary remains blocked for incomplete evidence, and the same interceptor executes the safe corroboration path. A separate scripted model test covers a genuinely hanging required responder and marks it degraded when the evidence deadline expires.
+
+Accepted model evidence is also constrained: producer identity is bound to the registered role, confidence must be finite and within `[0,1]`, malformed or spoofed evidence is excluded from safety calculations, and duplicate role hypotheses cannot double-count. This is bounded incident-phase safety logic, not a claim of arbitrary process recovery or distributed fault tolerance.
 
 ## Model and provider mode
 
@@ -100,12 +107,12 @@ A scripted `InferenceRunner` integration test exercises this lifecycle through M
 ## Verification
 
 ```bash
-npm run verify       # typecheck, 12 tests, production build, built smoke check
+npm run verify       # typecheck, 15 focused tests, production build, built smoke check
 npm run ablation     # causal action-boundary comparison
 npm run degradation  # explicit responder timeout
 ```
 
-The tests cover overlap, active peer observations, shared-state gating, adaptive follow-up, interception and executable rewriting, event-driven completion, structured model hypotheses, timeout snapshots, and the causal ablation.
+The focused tests cover overlap, real Mozaik interception, fail-closed pending actions, complete approval, conflicting and incomplete boundary decisions, immutable boundary snapshots, late evidence, hanging/explicit responder degradation, confidence validation, producer-role binding, duplicate handling, the causal scheduling ablation, and the scripted two-phase model lifecycle.
 
 <details>
 <summary>Additional commands and supporting measurements</summary>

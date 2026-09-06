@@ -15,8 +15,8 @@ Current release highlights:
 - Trace and Dependency reactions to that new plan, producing two follow-up corroboration events.
 - Canonical zero-key traversal of Mozaik's interception path: `rollback_production` is rewritten to the registered proposal-only `request_corroboration` tool and the safe tool executes.
 - Structured provider hypotheses that preserve claim, confidence, and root-cause data.
-- Dependency-timeout degradation that remains fail-closed while surviving responders continue.
-- A fixed-action-boundary causal ablation where evidence scheduling alone changes which tool crosses the safety boundary.
+- Fail-closed action-boundary handling for missing required evidence, including explicit timeout and generally hanging responder degradation.
+- A fixed-action-boundary causal ablation where evidence scheduling alone changes the safe control path available: conflict-informed canary immediately versus a conservative hold for missing evidence.
 - Event-driven scenario completion, bounded timeout behavior, and stable returned snapshots.
 - Product-first README, causal hero, social-preview asset, cleaned documentation layout, and GitHub Actions verification.
 
