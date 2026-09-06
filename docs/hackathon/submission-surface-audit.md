@@ -2,33 +2,50 @@
 
 Repository correctness and public submission health are separate release gates.
 
-## Previously observed blocker
+## Historical blocker
 
-On 2026-09-06, the gallery index listed `incidentmesh-40ad9c`, while `GET https://hackathon-api.jigjoy.ai/gallery/incidentmesh-40ad9c` returned HTTP 404. Comparison entries returned healthy detail records. Do not assume that stale slug is still authoritative.
+On 2026-09-06, the gallery index briefly listed `incidentmesh-40ad9c` while the detail API returned HTTP 404. A later logged-out check recovered to HTTP 200. Keep the index/detail consistency check in the release process, but do not assume the old failure still applies.
 
-## Current public health
+## Current logged-out public state
 
-A later logged-out check on 2026-09-06 returned HTTP 200 for the detail API and public page at `incidentmesh-40ad9c`. The record contained the repository URL and all four submitted screenshots.
+Live audit on 2026-09-06:
 
-## Final verified resubmission
+- Public slug: `incidentmesh-40ad9c`.
+- `https://hackathon-api.jigjoy.ai/gallery/incidentmesh-40ad9c` returns HTTP 200.
+- `https://build.jigjoy.ai/gallery/incidentmesh-40ad9c` renders logged out.
+- Repository field is `https://github.com/1337isnot1337/incidentmesh` and opens successfully.
+- Four screenshots are present in the intended `01 -> 04` order.
+- The four public screenshot bytes exactly match the four current repository PNG files by SHA-256/byte comparison; all are 1600x900.
+- The current public description and concurrency explanation are the older dense versions from the prior resubmission.
+- The current public `demo` field is empty.
+- The current public `deploy` field is empty.
 
-The final entry was published at `2026-09-06T15:23:15.057Z` after `master` advanced to `ef0c78eb27e4ab0aa514300d1764c2344f2ebd83` and CI passed.
+Therefore the existing gallery record is healthy but **not the final submission state**. It still needs one final resubmission with the approved video URL and simplified copy.
 
-- Project and repository are unchanged: `IncidentMesh` and `https://github.com/1337isnot1337/incidentmesh`.
-- Description is exactly 1,210 characters and concurrency explanation is exactly 1,490 characters; both byte-for-byte text comparisons against [`submission.md`](submission.md) passed.
-- No demo or deployment URL existed before resubmission; both remain empty.
-- Four 1600×900 screenshots are public in the intended `01 → 04` order. Cache-busted downloads exactly matched the local files by SHA-256 and byte comparison.
-- Logged out, the gallery index card uses `jigjoy-01-cover.png`; the detail page renders the new stale-plan and 1,389 ms authenticated-overlap claims; all four images and the repository link are present.
+## Ready-to-submit target
 
-## Final recovery check
+Use [`submission.md`](submission.md) as the source of truth for the final form values:
 
-After resubmission:
+- Project: `IncidentMesh`
+- Repository: `https://github.com/1337isnot1337/incidentmesh`
+- Description: 781 characters
+- Concurrency explanation: 965 characters
+- Demo/video URL: `https://www.youtube.com/watch?v=ohw8Ybt_dIM`
+- Screenshots: `jigjoy-01-cover.png` through `jigjoy-04-safety-proof.png`, in order
+
+The final video is live and embeddable on YouTube and has a processed 1080p stream. The repository and YouTube URL both return HTTP 200 logged out.
+
+## Final recovery check after resubmission
+
+After submitting the final revision:
 
 1. fetch `https://hackathon-api.jigjoy.ai/gallery`;
-2. discover the currently listed IncidentMesh slug;
+2. discover the currently listed IncidentMesh slug rather than assuming it is unchanged;
 3. request `https://hackathon-api.jigjoy.ai/gallery/<slug>` and require HTTP 200 with an IncidentMesh entry;
 4. open `https://build.jigjoy.ai/gallery/<slug>` logged out;
-5. verify repository, video, all screenshots, first-image cover, description, and concurrency copy.
+5. verify repository, video, all four screenshots, and first-image cover;
+6. compare the public description and concurrency strings against [`submission.md`](submission.md);
+7. require the public demo field to equal `https://www.youtube.com/watch?v=ohw8Ybt_dIM`.
 
 Diagnostics:
 
@@ -37,7 +54,7 @@ curl -fsS https://hackathon-api.jigjoy.ai/gallery
 curl -i https://hackathon-api.jigjoy.ai/gallery/<current-slug>
 ```
 
-If the index is healthy but the detail endpoint remains 404 after one final resubmission, preserve exact HTTP responses and contact organizers without speculating about the backend cause:
+If the index is healthy but the detail endpoint is broken after the final resubmission, preserve the exact responses and contact organizers without speculating about the backend cause:
 
 - Discord: https://discord.gg/dvxY9J2kWX
 - Email: miodrag.vilotijevic@jigjoy.ai
