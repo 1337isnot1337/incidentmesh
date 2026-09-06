@@ -1,3 +1,5 @@
+<img align="right" src="docs/assets/astra-credit.svg" width="148" height="44" alt="developed with gpt-6-astra" />
+
 <h1>
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/assets/wordmark-dark.svg" />
