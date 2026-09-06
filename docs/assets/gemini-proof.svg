@@ -66,7 +66,7 @@
       <text x="500" y="329" fill="#708794">→</text>
       <text x="530" y="329" fill="#8ee3c7">request_corroboration</text>
       <text x="754" y="329" fill="#708794">→</text>
-      <text x="784" y="329" fill="#b0c1cc">provider follow-up</text>
+      <text x="784" y="329" fill="#b0c1cc" font-size="16">provider follow-up</text>
     </g>
 
     <text x="40" y="357" fill="#708794" font-size="15">Authenticated receipt source commit 65d98f8 · no production mutation · not a final-SHA provider run</text>
