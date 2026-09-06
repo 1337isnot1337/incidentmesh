@@ -64,7 +64,10 @@ The later evidence is identical in both arms. The difference is scheduling.
 
 ## One real Gemini run
 
-<img src="docs/assets/gemini-proof.svg" alt="Authenticated historical Gemini run: Trace, Dependency, and Impact calls overlap for 1,389 ms; rollback_production is intercepted and rewritten to request_corroboration before provider follow-up." width="960" />
+<picture>
+  <source media="(max-width: 600px)" srcset="docs/assets/gemini-proof-narrow.svg" />
+  <img src="docs/assets/gemini-proof.svg" alt="Authenticated historical Gemini run: Trace, Dependency, and Impact calls overlap for 1,389 ms; rollback_production is intercepted and rewritten to request_corroboration before provider follow-up." width="960" />
+</picture>
 
 A historical authenticated run on Google `gemini-3.5-flash-lite` records all three responder provider calls in flight together for **1,389 ms**. After all three hypotheses arrive, the shared gate is `BLOCKED — conflicting-evidence`.
 
