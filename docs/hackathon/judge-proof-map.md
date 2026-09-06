@@ -1,0 +1,16 @@
+# Judge proof map
+
+| Judge concern | Artifact | Exact supported claim | Limitation |
+| --- | --- | --- | --- |
+| Real model concurrency | [`../evidence/real-provider-run.md`](../evidence/real-provider-run.md) | One authenticated Google `gemini-3.5-flash-lite` execution has 1,389 ms common three-way responder overlap and 3/3 structured hypotheses. | One historical bounded capture. |
+| Real provider Phase 2 | Same receipt/JSON | Gemini proposes rollback; Mozaik interception occurs; request_corroboration executes; provider follow-up is recorded. | Captured on the receipt's recorded commit, not relabeled as final-SHA evidence. |
+| Concurrency changes decision validity | [`../evidence/stale-plan-ablation.md`](../evidence/stale-plan-ablation.md) | Same revision-1 plan/action/evidence/policy/boundary; concurrent peer progress produces boundary revision 3 and stale invalidation; serialization stays revision 1 and permits the bounded proposal. | Deterministic replay of frozen provider outputs; bounded tool is proposal-only. |
+| Fresh replan sees new truth | Same stale-plan receipt | After stale rewrite, a fresh revision-3 planning pass sees the complete conflict and remains blocked. | Deterministic planner fixture. |
+| Scheduling improves safe-action availability | [`../evidence/safe-action-ablation.md`](../evidence/safe-action-ablation.md) | Both rollback arms fail closed; concurrent complete conflict enables targeted safe planning while sequential missing evidence requires a hold. | Configured fixture boundary, not MTTR. |
+| Enforcement is real Mozaik machinery | `npm run demo`, [`../evidence/replay.json`](../evidence/replay.json) | Real function-call transition → SafetyGateInterception → request_corroboration tool. | Deterministic inference fixture in canonical replay. |
+| Safety beyond one demo | [`../evidence/safety-stress.md`](../evidence/safety-stress.md) | 10,000 seeded cases / 40,000 attempts / zero unauthorized rollback, bounded, or stale non-safe crossings; zero policy/isolation/mutation violations. | Property-style deterministic generation, not production traffic. |
+| Approved symmetry | focused test | Fresh complete consistent high-confidence evidence permits proposal-only rollback unchanged. | Scripted local proof; no production mutation. |
+| Degradation | [`../evidence/degradation.md`](../evidence/degradation.md) | Missing required responder closes, revision advances, action fails closed, safe tool executes. | Deterministic degradation fixture. |
+| Semantic stability | [`../evidence/semantic-stability.md`](../evidence/semantic-stability.md) | 100 arm executions preserve both causal projections with zero semantic mismatches. | Wall-clock timing is deliberately excluded; this is not a latency claim. |
+
+One sentence: **Real providers overlap; concurrent peer progress can invalidate in-flight planning; immutable Mozaik action boundaries prevent stale or unsafe tools from crossing.**

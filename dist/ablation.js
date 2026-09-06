@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { mkdir, writeFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
 import { runIncidentScenario } from "./app.js";
 const boundaryMs = 205;
 const shared = { dryRun: true, actionProposalMs: 45, actionBoundaryMs: boundaryMs };
@@ -32,6 +34,7 @@ assert.ok(concurrent.action.actionableSafePlanAtMs !== null);
 assert.ok(sequential.action.actionableSafePlanAtMs !== null);
 assert.ok(concurrent.action.actionableSafePlanAtMs < sequential.action.actionableSafePlanAtMs);
 const result = {
+    schema: "incidentmesh.safe-action-ablation/v1",
     experiment: "fail-closed action-boundary evidence scheduling ablation",
     constants: {
         incident: concurrent.incident,
@@ -49,7 +52,6 @@ const result = {
         safeActionAtBoundary: concurrent.action.boundarySafeAction,
         intercepted: concurrent.action.intercepted,
         executedTool: concurrent.action.executedTool,
-        timeToActionableSafeMitigationMs: concurrent.action.actionableSafePlanAtMs,
         finalGate: concurrent.gateDecision,
         finalGateReason: concurrent.gateReason,
     },
@@ -61,11 +63,25 @@ const result = {
         safeActionAtBoundary: sequential.action.boundarySafeAction,
         intercepted: sequential.action.intercepted,
         executedTool: sequential.action.executedTool,
-        timeToActionableSafeMitigationMs: sequential.action.actionableSafePlanAtMs,
         finalGate: sequential.gateDecision,
         finalGateReason: sequential.gateReason,
     },
     causalFinding: "Same evidence, gate, rollback proposal, and deadline. Parallel scheduling exposes the conflict before the boundary and makes the targeted canary plan actionable immediately; serialized scheduling leaves required evidence missing, so the same fail-closed gate holds the action until the conflict becomes visible later.",
-    limitation: "The rollback tool is proposal-only. Time-to-actionable-safe-mitigation is a deterministic fixture latency, not MTTR or a production speedup claim.",
+    limitation: "The rollback tool is proposal-only. The configured boundary and observed ordering are deterministic fixture behavior, not MTTR or a production speedup claim.",
 };
+const outputJson = resolve("docs/evidence/safe-action-ablation.json");
+const outputMd = resolve("docs/evidence/safe-action-ablation.md");
+const markdown = `# Safe-action availability ablation\n\n` +
+    `Same incident, eventual evidence, policy, rollback proposal, and configured 205 ms action boundary. **Only responder scheduling changes. Both arms fail closed.**\n\n` +
+    `| | Concurrent | Sequential |\n| --- | --- | --- |\n` +
+    `| Hypotheses at boundary | ${result.concurrent.hypothesesAtBoundary} / 3 | ${result.sequential.hypothesesAtBoundary} / 3 |\n` +
+    `| Contradictions visible | ${result.concurrent.contradictionsAtBoundary} | ${result.sequential.contradictionsAtBoundary} |\n` +
+    `| Rollback decision | **${result.concurrent.gateAtBoundary}** | **${result.sequential.gateAtBoundary}** |\n` +
+    `| Gate reason | \`${result.concurrent.gateReasonAtBoundary}\` | \`${result.sequential.gateReasonAtBoundary}\` |\n` +
+    `| Safe plan at boundary | ${result.concurrent.safeActionAtBoundary} | ${result.sequential.safeActionAtBoundary} |\n` +
+    `| Executed tool | \`${result.concurrent.executedTool}\` | \`${result.sequential.executedTool}\` |\n\n` +
+    `${result.causalFinding}\n\n${result.limitation}\n`;
+await mkdir(dirname(outputJson), { recursive: true });
+await writeFile(outputJson, `${JSON.stringify(result, null, 2)}\n`, "utf8");
+await writeFile(outputMd, markdown, "utf8");
 console.log(JSON.stringify(result, null, 2));

@@ -1,0 +1,66 @@
+{
+  "schema": "incidentmesh.semantic-stability/v2",
+  "repetitionsPerArm": 25,
+  "runs": 100,
+  "semanticMismatches": [],
+  "stalePlanMismatches": [],
+  "concurrent": {
+    "expected": {
+      "gateAtBoundary": "blocked",
+      "gateReasonAtBoundary": "conflicting-evidence",
+      "hypothesesAtBoundary": 3,
+      "contradictionsAtBoundary": 2,
+      "boundarySafeAction": "canary-with-targeted-corroboration",
+      "intercepted": true,
+      "executedTool": "request_corroboration",
+      "finalGate": "blocked",
+      "finalReason": "conflicting-evidence",
+      "timedOut": false
+    }
+  },
+  "sequential": {
+    "expected": {
+      "gateAtBoundary": "blocked",
+      "gateReasonAtBoundary": "incomplete-required-evidence",
+      "hypothesesAtBoundary": 1,
+      "contradictionsAtBoundary": 0,
+      "boundarySafeAction": "hold-for-missing-evidence",
+      "intercepted": true,
+      "executedTool": "request_corroboration",
+      "finalGate": "blocked",
+      "finalReason": "conflicting-evidence",
+      "timedOut": false
+    }
+  },
+  "stalePlan": {
+    "expected": {
+      "concurrent": {
+        "planningRevision": 1,
+        "boundaryRevision": 3,
+        "fresh": false,
+        "crossed": false,
+        "policyReason": "stale-plan",
+        "rewritten": true
+      },
+      "sequential": {
+        "planningRevision": 1,
+        "boundaryRevision": 1,
+        "fresh": true,
+        "crossed": true,
+        "policyReason": "fresh-bounded-evidence",
+        "rewritten": false
+      },
+      "invariants": {
+        "sameEventualEvidence": true,
+        "sameFirstPlanningRevision": true,
+        "sameCandidateAction": true,
+        "concurrentProposalInvalidatedAsStale": true,
+        "concurrentFreshReplanSeesConflict": true,
+        "sequentialProposalCrossedWhileFresh": true,
+        "unauthorizedRollbackCrossings": 0,
+        "staleNonSafeCrossings": 0
+      }
+    }
+  },
+  "finding": "Host timer jitter is intentionally excluded from the receipt; the fixed-boundary and revision-stamped stale-plan semantic projections remained stable across every repeated run."
+}

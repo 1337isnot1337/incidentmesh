@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import {
   IncidentState,
+  PLAN_STALE,
   ROLES,
   SafetyGateInterception,
   evaluateSafetyGate,
@@ -12,8 +13,11 @@ import {
   type Hypothesis,
   type Role,
 } from "./app.js"
-import { FunctionCallItem, ModelMessageItem, SemanticEvent } from "@mozaik-ai/core"
+import { FunctionCallItem, FunctionCallOutputItem, GeminiGenerateContent, ModelContext, ModelMessageItem, SemanticEvent, UserMessageItem } from "@mozaik-ai/core"
 import type { ExecutableTransition, InferenceInput, InferenceOutput, InferenceRunner } from "@mozaik-ai/core"
+import { runSafetyStress } from "./safety-stress.js"
+import { GeminiSignaturePreservingRunner } from "./gemini-compat.js"
+import { runStalePlanAblation } from "./stale-plan.js"
 
 function hypothesis(role: Role, confidence = 0.9, rootCause = "same-cause"): Hypothesis {
   return { role, claim: `${role} claim`, confidence, rootCause, atMs: 0 }
@@ -22,6 +26,22 @@ function hypothesis(role: Role, confidence = 0.9, rootCause = "same-cause"): Hyp
 function rollbackTransition(callId: string): Extract<ExecutableTransition, { nextStateId: "function_call" }> {
   const call = FunctionCallItem.rehydrate({ callId, name: "rollback_production", args: "{}" })
   return { nextStateId: "function_call", input: { call, inferenceInput: {} as never } }
+}
+
+function canaryTransition(callId: string, targetCause = "same-cause"): Extract<ExecutableTransition, { nextStateId: "function_call" }> {
+  const call = FunctionCallItem.rehydrate({
+    callId,
+    name: "targeted_canary_probe",
+    args: JSON.stringify({ service: "checkout-api", targetCause, scope: "five-percent-diagnostic-canary" }),
+  })
+  return { nextStateId: "function_call", input: { call, inferenceInput: {} as never } }
+}
+
+function registerControllerAndStartPlan(state: IncidentState, id = "action-controller-id") {
+  state.registerActionController(id)
+  const plan = state.startPlan(id)
+  assert.ok(plan)
+  return { id, plan }
 }
 
 function normalizeHypotheses(report: Awaited<ReturnType<typeof runIncidentScenario>>) {
@@ -141,11 +161,43 @@ test("gate policy distinguishes investigation waiting from fail-closed action de
   const weak = ROLES.map((role) => hypothesis(role, 0.7, "same-cause"))
   assert.equal(evaluateSafetyGate(weak).decision, "blocked")
   assert.equal(evaluateSafetyGate(weak).reason, "low-confidence-evidence")
+
+  const weakOutlier = [
+    hypothesis("trace", 1, "same-cause"),
+    hypothesis("dependency", 1, "same-cause"),
+    hypothesis("impact", 0.4, "same-cause"),
+  ]
+  assert.ok(Math.abs(evaluateSafetyGate(weakOutlier).confidence - 0.8) < 1e-12)
+  assert.equal(evaluateSafetyGate(weakOutlier).decision, "blocked")
+  assert.equal(evaluateSafetyGate(weakOutlier).reason, "low-confidence-evidence")
+})
+
+test("every non-empty missing-role combination fails closed with an explicit hold", () => {
+  for (let mask = 1; mask < (1 << ROLES.length); mask += 1) {
+    const missing = ROLES.filter((_, index) => (mask & (1 << index)) !== 0)
+    const state = new IncidentState()
+    for (const role of ROLES) state.registerResponder(role, `${role}-id`)
+    for (const role of ROLES) {
+      if (missing.includes(role)) continue
+      assert.equal(state.acceptHypothesis(`${role}-id`, {
+        role, claim: `${role} claim`, confidence: 0.9, rootCause: "same-cause",
+      }).status, "accepted")
+    }
+
+    registerControllerAndStartPlan(state)
+    const snapshot = state.captureActionBoundarySnapshot("rollback_production")
+    assert.equal(snapshot.decision, "blocked")
+    assert.equal(snapshot.reason, "incomplete-required-evidence")
+    assert.deepEqual(snapshot.missingRequiredRoles, missing)
+    assert.equal(snapshot.availableRoles.length + snapshot.missingRequiredRoles.length, ROLES.length)
+    assert.equal(state.boundarySafeAction, "hold-for-missing-evidence")
+  }
 })
 
 test("rollback interception requires affirmative approval, not mere absence of a block", async () => {
   const pendingState = new IncidentState()
-  const pendingGate = new SafetyGateInterception(pendingState)
+  const pendingContext = registerControllerAndStartPlan(pendingState)
+  const pendingGate = new SafetyGateInterception(pendingState, { producerId: pendingContext.id, planId: pendingContext.plan.planId })
   const pending = rollbackTransition("pending-rollback")
   assert.equal(pendingGate.isSatisfiedBy(pending), true)
   const rewrittenPending = await pendingGate.handle(pending)
@@ -159,7 +211,31 @@ test("rollback interception requires affirmative approval, not mere absence of a
   const approvedState = new IncidentState()
   approvedState.gateDecision = "approved"
   approvedState.gateReason = "sufficient-consistent-evidence"
-  assert.equal(new SafetyGateInterception(approvedState).isSatisfiedBy(rollbackTransition("approved-rollback")), false)
+  const approvedContext = registerControllerAndStartPlan(approvedState)
+  const approvedGate = new SafetyGateInterception(approvedState, { producerId: approvedContext.id, planId: approvedContext.plan.planId })
+  const approvedWithoutEvidence = rollbackTransition("approved-live-gate-only")
+  assert.equal(approvedGate.isSatisfiedBy(approvedWithoutEvidence), true)
+  const rewrittenApprovedWithoutSnapshot = await approvedGate.handle(approvedWithoutEvidence)
+  assert.equal((rewrittenApprovedWithoutSnapshot as typeof approvedWithoutEvidence).input.call.name, "request_corroboration")
+  assert.equal(approvedState.actionBoundarySnapshot?.decision, "blocked")
+
+  const snapshotApprovedState = new IncidentState()
+  for (const role of ROLES) {
+    snapshotApprovedState.registerResponder(role, `${role}-id`)
+    assert.equal(snapshotApprovedState.acceptHypothesis(`${role}-id`, {
+      role, claim: `${role} claim`, confidence: 0.9, rootCause: "same-cause",
+    }).status, "accepted")
+  }
+  const snapshotApprovedContext = registerControllerAndStartPlan(snapshotApprovedState)
+  const approvedTransition = rollbackTransition("approved-snapshot")
+  const snapshotApprovedGate = new SafetyGateInterception(snapshotApprovedState, {
+    producerId: snapshotApprovedContext.id,
+    planId: snapshotApprovedContext.plan.planId,
+  })
+  assert.equal(snapshotApprovedGate.isSatisfiedBy(approvedTransition), true)
+  const passedApproved = await snapshotApprovedGate.handle(approvedTransition)
+  assert.equal((passedApproved as typeof approvedTransition).input.call.name, "rollback_production")
+  assert.equal(snapshotApprovedState.actionBoundarySnapshot?.decision, "approved")
 
   const safeCall = FunctionCallItem.rehydrate({ callId: "safe", name: "request_corroboration", args: "{}" })
   const safeTransition = { nextStateId: "function_call" as const, input: { call: safeCall, inferenceInput: {} as never } }
@@ -178,6 +254,7 @@ test("action-boundary snapshot is immutable while late evidence updates investig
     role: "trace", claim: "trace claim", confidence: 0.9, rootCause: "cause-a",
   }).status, "accepted")
 
+  registerControllerAndStartPlan(state)
   const snapshot = state.captureActionBoundarySnapshot("rollback_production")
   const serialized = JSON.stringify(snapshot)
   assert.equal(Object.isFrozen(snapshot), true)
@@ -199,6 +276,318 @@ test("action-boundary snapshot is immutable while late evidence updates investig
   assert.deepEqual(snapshot.availableRoles, ["trace"])
   assert.deepEqual(snapshot.missingRequiredRoles, ["dependency", "impact"])
   assert.equal(evaluateSafetyGate(state.hypotheses).reason, "conflicting-evidence")
+})
+
+test("decision revision advances only for authoritative action-relevant mutations", () => {
+  const state = new IncidentState()
+  for (const role of ROLES) state.registerResponder(role, `${role}-id`)
+  assert.equal(state.decisionRevision, 0)
+
+  assert.equal(state.acceptHypothesis("trace-id", {
+    role: "trace", claim: "authoritative", confidence: 0.9, rootCause: "cause-a",
+  }).status, "accepted")
+  assert.equal(state.decisionRevision, 1)
+
+  assert.equal(state.acceptHypothesis("trace-id", {
+    role: "trace", claim: "duplicate", confidence: 1, rootCause: "cause-b",
+  }).status, "duplicate")
+  assert.equal(state.acceptHypothesis("attacker", {
+    role: "impact", claim: "spoof", confidence: 1, rootCause: "cause-z",
+  }).status, "spoofed-role")
+  assert.equal(state.decisionRevision, 1)
+  assert.equal(state.markDegraded("impact", "attacker"), false)
+  assert.equal(state.decisionRevision, 1)
+
+  assert.equal(state.markDegraded("dependency"), true)
+  assert.equal(state.decisionRevision, 2)
+  assert.equal(state.markDegraded("dependency"), false)
+  assert.equal(state.decisionRevision, 2)
+  assert.equal(state.timeline.filter((item) => item.type === "incident.decision.revision-advanced").length, 2)
+})
+
+test("a plan freezes the revision and evidence it actually reasoned over", () => {
+  const state = new IncidentState()
+  state.registerResponder("trace", "trace-id")
+  state.registerResponder("dependency", "dependency-id")
+  state.registerActionController("controller-id")
+  state.acceptHypothesis("trace-id", { role: "trace", claim: "trace", confidence: 0.9, rootCause: "cause-a" })
+  const plan = state.startPlan("controller-id", "revision-one-plan")
+  assert.ok(plan)
+  assert.equal(plan.basedOnRevision, 1)
+  assert.deepEqual(plan.availableRoles, ["trace"])
+  assert.equal(Object.isFrozen(plan), true)
+  assert.equal(Object.isFrozen(plan.hypotheses), true)
+
+  state.acceptHypothesis("dependency-id", { role: "dependency", claim: "dependency", confidence: 0.9, rootCause: "cause-b" })
+  assert.equal(state.decisionRevision, 2)
+  assert.equal(plan.basedOnRevision, 1)
+  assert.deepEqual(plan.availableRoles, ["trace"])
+})
+
+test("stale bounded and destructive proposals are both rewritten before execution", async () => {
+  const state = new IncidentState()
+  state.registerResponder("trace", "trace-id")
+  state.registerResponder("dependency", "dependency-id")
+  state.registerActionController("controller-id")
+  state.acceptHypothesis("trace-id", { role: "trace", claim: "trace", confidence: 0.9, rootCause: "cause-a" })
+  const plan = state.startPlan("controller-id", "stale-plan")
+  assert.ok(plan)
+  state.acceptHypothesis("dependency-id", { role: "dependency", claim: "dependency", confidence: 0.9, rootCause: "cause-b" })
+
+  const interceptor = new SafetyGateInterception(state, { producerId: "controller-id", planId: plan.planId })
+  const canary = await interceptor.handle(canaryTransition("stale-canary", "cause-a"))
+  const rollback = await interceptor.handle(rollbackTransition("stale-rollback"))
+  assert.equal((canary as ReturnType<typeof canaryTransition>).input.call.name, "request_corroboration")
+  assert.equal((rollback as ReturnType<typeof rollbackTransition>).input.call.name, "request_corroboration")
+  assert.equal(state.actionAttempts.length, 2)
+  assert.ok(state.actionAttempts.every((attempt) => !attempt.fresh && attempt.policyReason === "stale-plan"))
+  assert.equal(state.timeline.filter((item) => item.type === PLAN_STALE).length, 2)
+})
+
+test("a proposal cannot override the revision frozen into its registered plan", async () => {
+  const state = new IncidentState()
+  state.registerResponder("trace", "trace-id")
+  state.registerResponder("dependency", "dependency-id")
+  state.registerActionController("controller-id")
+  state.acceptHypothesis("trace-id", { role: "trace", claim: "trace", confidence: 0.9, rootCause: "cause-a" })
+  const plan = state.startPlan("controller-id", "truthful-plan")
+  assert.ok(plan)
+  state.acceptHypothesis("dependency-id", { role: "dependency", claim: "dependency", confidence: 0.9, rootCause: "cause-a" })
+
+  const forgedCall = FunctionCallItem.rehydrate({
+    callId: "lying-revision",
+    name: "targeted_canary_probe",
+    args: JSON.stringify({
+      service: "checkout-api",
+      targetCause: "cause-a",
+      scope: "five-percent-diagnostic-canary",
+      basedOnRevision: state.decisionRevision,
+      planId: "forged-current-plan",
+    }),
+  })
+  const forgedTransition = { nextStateId: "function_call" as const, input: { call: forgedCall, inferenceInput: {} as never } }
+  const result = await new SafetyGateInterception(state, { producerId: "controller-id", planId: plan.planId })
+    .handle(forgedTransition)
+  assert.equal((result as typeof forgedTransition).input.call.name, "request_corroboration")
+  assert.equal(state.actionBoundarySnapshot?.basedOnRevision, 1)
+  assert.equal(state.actionBoundarySnapshot?.boundaryRevision, 2)
+  assert.equal(state.actionBoundarySnapshot?.policyReason, "stale-plan")
+})
+
+test("fresh bounded policy allows a matching strong probe but rejects weak, conflicting, degraded, or mismatched evidence", async () => {
+  const run = async (input: { confidence?: number; secondCause?: string; degraded?: boolean; target?: string }) => {
+    const state = new IncidentState()
+    state.registerResponder("trace", "trace-id")
+    state.registerResponder("dependency", "dependency-id")
+    state.registerActionController("controller-id")
+    state.acceptHypothesis("trace-id", {
+      role: "trace", claim: "trace", confidence: input.confidence ?? 0.9, rootCause: "cause-a",
+    })
+    if (input.secondCause !== undefined) {
+      state.acceptHypothesis("dependency-id", {
+        role: "dependency", claim: "dependency", confidence: 0.9, rootCause: input.secondCause,
+      })
+    }
+    if (input.degraded) state.markDegraded("impact")
+    const plan = state.startPlan("controller-id")
+    assert.ok(plan)
+    const transition = canaryTransition("bounded-policy", input.target ?? "cause-a")
+    const result = await new SafetyGateInterception(state, { producerId: "controller-id", planId: plan.planId }).handle(transition)
+    return { state, call: (result as typeof transition).input.call.name }
+  }
+
+  assert.equal((await run({})).call, "targeted_canary_probe")
+  assert.equal((await run({ confidence: 0.79 })).call, "request_corroboration")
+  assert.equal((await run({ secondCause: "cause-b" })).call, "request_corroboration")
+  assert.equal((await run({ degraded: true })).call, "request_corroboration")
+  assert.equal((await run({ target: "cause-z" })).call, "request_corroboration")
+})
+
+test("each action attempt receives a distinct frozen authorization record", async () => {
+  const state = new IncidentState()
+  for (const role of ROLES) {
+    state.registerResponder(role, `${role}-id`)
+    state.acceptHypothesis(`${role}-id`, { role, claim: role, confidence: 0.9, rootCause: "same-cause" })
+  }
+  const { id, plan } = registerControllerAndStartPlan(state)
+  const interceptor = new SafetyGateInterception(state, { producerId: id, planId: plan.planId })
+  await interceptor.handle(rollbackTransition("attempt-one"))
+  const first = state.actionAttempts[0]
+  const fingerprint = JSON.stringify(first)
+  state.markDegraded("impact")
+  await interceptor.handle(rollbackTransition("attempt-two"))
+  const second = state.actionAttempts[1]
+
+  assert.notEqual(first.attemptId, second.attemptId)
+  assert.equal(first.policyDecision, "approved")
+  assert.equal(second.policyDecision, "blocked")
+  assert.equal(second.policyReason, "stale-plan")
+  assert.equal(Object.isFrozen(first), true)
+  assert.equal(JSON.stringify(first), fingerprint)
+})
+
+test("invalid Action Controller or plan provenance cannot authorize an action", async () => {
+  const state = new IncidentState()
+  for (const role of ROLES) {
+    state.registerResponder(role, `${role}-id`)
+    state.acceptHypothesis(`${role}-id`, { role, claim: role, confidence: 0.95, rootCause: "same-cause" })
+  }
+  state.registerActionController("real-controller")
+  assert.equal(state.startPlan("attacker", "forged-plan"), null)
+  const result = await new SafetyGateInterception(state, { producerId: "attacker", planId: "forged-plan" })
+    .handle(rollbackTransition("forged-rollback"))
+  assert.equal((result as ReturnType<typeof rollbackTransition>).input.call.name, "request_corroboration")
+  assert.equal(state.actionBoundarySnapshot?.policyReason, "invalid-plan-provenance")
+})
+
+test("unbound or responder-originated transitions cannot borrow an active Action Controller plan", async () => {
+  const state = new IncidentState()
+  for (const role of ROLES) {
+    state.registerResponder(role, `${role}-id`)
+    state.acceptHypothesis(`${role}-id`, { role, claim: role, confidence: 0.95, rootCause: "same-cause" })
+  }
+  const { plan } = registerControllerAndStartPlan(state)
+
+  const unbound = rollbackTransition("unbound-borrow-attempt")
+  const unboundResult = await new SafetyGateInterception(state).handle(unbound)
+  assert.equal((unboundResult as typeof unbound).input.call.name, "request_corroboration")
+  assert.equal(state.actionAttempts.at(-1)?.planId, "invalid-plan")
+  assert.equal(state.actionAttempts.at(-1)?.policyReason, "invalid-plan-provenance")
+
+  const responder = rollbackTransition("responder-borrow-attempt")
+  const responderResult = await new SafetyGateInterception(state, {
+    producerId: "trace-id",
+    planId: plan.planId,
+  }).handle(responder)
+  assert.equal((responderResult as typeof responder).input.call.name, "request_corroboration")
+  assert.equal(state.actionAttempts.at(-1)?.policyReason, "invalid-plan-provenance")
+})
+
+test("provider-derived stale-plan ablation changes only peer scheduling and proves the revision race", async () => {
+  const evidence = [
+    { role: "trace" as const, claim: "trace", confidence: 0.85, rootCause: "cause-a" },
+    { role: "dependency" as const, claim: "dependency", confidence: 0.85, rootCause: "cause-b" },
+    { role: "impact" as const, claim: "impact", confidence: 0.85, rootCause: "cause-c" },
+  ]
+  const report = await runStalePlanAblation({
+    source: { receipt: "fixture", commit: "fixture", provider: "fixture", model: "fixture" },
+    evidence,
+  })
+  assert.deepEqual(report.invariants, {
+    sameEventualEvidence: true,
+    sameFirstPlanningRevision: true,
+    sameCandidateAction: true,
+    concurrentProposalInvalidatedAsStale: true,
+    concurrentFreshReplanSeesConflict: true,
+    sequentialProposalCrossedWhileFresh: true,
+    unauthorizedRollbackCrossings: 0,
+    staleNonSafeCrossings: 0,
+  })
+  assert.equal(report.concurrent.boundaryRevision, 3)
+  assert.equal(report.sequential.boundaryRevision, 1)
+  assert.equal(report.concurrent.freshReplan?.policyReason, "conflicting-evidence")
+})
+
+test("degraded responders are closed for the current action phase", () => {
+  const state = new IncidentState()
+  state.registerResponder("dependency", "dependency-id")
+  state.markDegraded("dependency")
+  assert.equal(state.acceptHypothesis("dependency-id", {
+    role: "dependency", claim: "late dependency claim", confidence: 1, rootCause: "same-cause",
+  }).status, "closed-role")
+  assert.equal(state.hypotheses.length, 0)
+  assert.equal(evaluateSafetyGate(state.hypotheses, state.degradedRoles).decision, "blocked")
+})
+
+test("a required responder closing after evidence cannot leave rollback authorized", async () => {
+  const state = new IncidentState()
+  for (const role of ROLES) {
+    state.registerResponder(role, `${role}-id`)
+    state.acceptHypothesis(`${role}-id`, { role, claim: role, confidence: 0.95, rootCause: "same-cause" })
+  }
+  state.registerActionController("controller-id")
+  assert.equal(evaluateSafetyGate(state.hypotheses, state.degradedRoles, "action-boundary").decision, "approved")
+  assert.equal(state.markDegraded("impact"), true)
+  assert.equal(evaluateSafetyGate(state.hypotheses, state.degradedRoles, "action-boundary").reason, "degraded-required-responder")
+  const plan = state.startPlan("controller-id")
+  assert.ok(plan)
+  const result = await new SafetyGateInterception(state, { producerId: "controller-id", planId: plan.planId })
+    .handle(rollbackTransition("closed-after-evidence"))
+  assert.equal((result as ReturnType<typeof rollbackTransition>).input.call.name, "request_corroboration")
+  assert.equal(state.actionBoundarySnapshot?.policyReason, "degraded-required-responder")
+})
+
+function seededRandom(seed: number): () => number {
+  let state = seed >>> 0
+  return () => {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0
+    return state / 0x1_0000_0000
+  }
+}
+
+test("seeded adversarial ordering preserves snapshot authorization and closed-role invariants", async () => {
+  for (let seed = 1; seed <= 500; seed += 1) {
+    const random = seededRandom(seed)
+    const state = new IncidentState()
+    for (const role of ROLES) state.registerResponder(role, `${role}-id`)
+    state.registerActionController("action-controller-id")
+
+    const closedRole = random() < 0.45 ? ROLES[Math.floor(random() * ROLES.length)] : null
+    if (closedRole !== null) state.markDegraded(closedRole)
+
+    const roles = [...ROLES]
+    for (let i = roles.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(random() * (i + 1))
+      ;[roles[i], roles[j]] = [roles[j], roles[i]]
+    }
+
+    const sameCause = random() < 0.5
+    const confidences = new Map<Role, number>(ROLES.map((role) => [role, random() < 0.75 ? 0.8 + random() * 0.2 : random() * 0.79]))
+    const captureAfter = Math.floor(random() * (ROLES.length + 1))
+    let attemptedClosedRole = false
+
+    for (let index = 0; index < roles.length; index += 1) {
+      if (index === captureAfter) {
+        state.startPlan("action-controller-id")
+        state.captureActionBoundarySnapshot("rollback_production")
+      }
+      const role = roles[index]
+      const result = state.acceptHypothesis(`${role}-id`, {
+        role,
+        claim: `${role} seed ${seed}`,
+        confidence: confidences.get(role),
+        rootCause: sameCause ? "same-cause" : `cause-${role}`,
+      })
+      if (role === closedRole) {
+        attemptedClosedRole = true
+        assert.equal(result.status, "closed-role", `seed=${seed}`)
+      }
+    }
+    if (captureAfter === ROLES.length) {
+      state.startPlan("action-controller-id")
+      state.captureActionBoundarySnapshot("rollback_production")
+    }
+
+    // Deliberately corrupt the mutable investigation gate; authorization must still
+    // be determined exclusively by the frozen action-boundary snapshot.
+    state.gateDecision = "approved"
+    state.gateReason = "sufficient-consistent-evidence"
+    const transition = rollbackTransition(`seed-${seed}`)
+    const activePlan = state.getActivePlan()
+    assert.ok(activePlan, `seed=${seed}`)
+    const result = await new SafetyGateInterception(state, {
+      producerId: "action-controller-id",
+      planId: activePlan.planId,
+    }).handle(transition)
+    const executed = (result as typeof transition).input.call.name
+    const snapshot = state.actionBoundarySnapshot
+    assert.ok(snapshot, `seed=${seed}`)
+    assert.equal(executed === "rollback_production", snapshot.decision === "approved", `seed=${seed}`)
+    if (closedRole !== null) {
+      assert.equal(attemptedClosedRole, true, `seed=${seed}`)
+      assert.equal(snapshot.availableRoles.includes(closedRole), false, `seed=${seed}`)
+    }
+  }
 })
 
 test("producer identity, unknown roles, and duplicate policy cannot alter safety aggregates", () => {
@@ -254,6 +643,114 @@ test("valid structured model evidence preserves provider confidence and root cau
   })
 })
 
+test("Mozaik 4.0.5 Gemini mapper does not preserve thought signatures across tool calls", () => {
+  const endpoint = new GeminiGenerateContent()
+  const context = new ModelContext("thought-signature-regression", [
+    UserMessageItem.rehydrate({ text: "choose a mitigation" }),
+    FunctionCallItem.rehydrate({
+      callId: "rollback-call",
+      name: "rollback_production",
+      args: JSON.stringify({ service: "checkout-api", reason: "test" }),
+    }),
+  ])
+  const request = endpoint.endpointMapper.toRequest({
+    model: "gemini-3.5-flash",
+    context,
+    tools: [],
+  }) as { contents: Array<{ parts: Array<{ functionCall?: Record<string, unknown> }> }> }
+  const functionCall = request.contents.at(-1)?.parts.at(-1)?.functionCall
+  assert.deepEqual(functionCall, {
+    id: "rollback-call",
+    name: "rollback_production",
+    args: { service: "checkout-api", reason: "test" },
+  })
+  assert.equal(functionCall && "thought_signature" in functionCall, false)
+})
+
+test("signature-preserving Gemini runner round-trips thought signatures locally", async () => {
+  const requests: Array<{ contents: Array<{ parts: Array<{ functionCall?: Record<string, unknown>; thoughtSignature?: string }> }> }> = []
+  const client = {
+    models: {
+      async generateContent(request: { contents: unknown[]; model: string; config: Record<string, unknown> }) {
+        requests.push(request as typeof requests[number])
+        return requests.length === 1
+          ? { candidates: [{ content: { parts: [{ functionCall: { id: "call-1", name: "rollback_production", args: {} }, thoughtSignature: "signature-1" }] } }] }
+          : { candidates: [{ content: { parts: [{ text: "safe recommendation" }] } }] }
+      },
+    },
+  }
+  const runner = new GeminiSignaturePreservingRunner(client)
+  const firstContext = new ModelContext("compat-test", [UserMessageItem.create("choose a mitigation")])
+  const first = await runner.run({ model: "gemini-3.5-flash", context: firstContext, tools: [] })
+  assert.equal(first.items[0]?.type, "function_call")
+  const secondContext = new ModelContext("compat-test", [
+    UserMessageItem.create("choose a mitigation"),
+    FunctionCallItem.rehydrate({ callId: "call-1", name: "rollback_production", args: "{}" }),
+    FunctionCallOutputItem.create("call-1", JSON.stringify({ status: "blocked" })),
+  ])
+  const second = await runner.run({ model: "gemini-3.5-flash", context: secondContext, tools: [] })
+  assert.equal(second.items[0]?.type, "message")
+  const functionPart = requests[1]?.contents.flatMap((item) => item.parts).find((part) => part.functionCall)
+  assert.equal(functionPart?.functionCall?.name, "rollback_production")
+  assert.equal(functionPart?.thoughtSignature, "signature-1")
+})
+
+test("Gemini runner omits unsupported none thinking level", async () => {
+  let config: Record<string, unknown> | undefined
+  const client = {
+    models: {
+      async generateContent(request: { contents: unknown[]; model: string; config: Record<string, unknown> }) {
+        config = request.config
+        return { candidates: [{ content: { parts: [{ text: "ok" }] } }] }
+      },
+    },
+  }
+  const runner = new GeminiSignaturePreservingRunner(client)
+  await runner.run({
+    model: "gemini-3.5-flash",
+    context: new ModelContext("thinking-level-test", [UserMessageItem.create("respond")]),
+    tools: [],
+    reasoningEffort: "none",
+  })
+  assert.equal("thinkingConfig" in (config ?? {}), false)
+})
+
+test("signature-preserving runner traverses the complete mocked provider Phase-2 loop", async () => {
+  const client = {
+    models: {
+      async generateContent(request: { contents: unknown[] }) {
+        const text = JSON.stringify(request.contents)
+        if (text.includes("mitigation owner in IncidentMesh")) {
+          const hasToolResult = text.includes("functionResponse")
+          return hasToolResult
+            ? { candidates: [{ content: { parts: [{ text: "keep rollback blocked; proceed with targeted corroboration" }] } }] }
+            : { candidates: [{ content: { parts: [{ functionCall: { id: "phase2-call", name: "rollback_production", args: { service: "checkout-api", reason: "restore service" } }, thoughtSignature: "phase2-signature" }] } }] }
+        }
+        const role = text.includes("trace responder") ? "trace"
+          : text.includes("dependency responder") ? "dependency"
+            : "impact"
+        const fixture = role === "trace"
+          ? { claim: "trace sees cache churn", confidence: 0.85, rootCause: "cache-stampede" }
+          : role === "dependency"
+            ? { claim: "dependency sees deploy-linked pool wait", confidence: 0.82, rootCause: "deploy-8f3" }
+            : { claim: "impact sees regional checkout failures", confidence: 0.88, rootCause: "regional-impact" }
+        return { candidates: [{ content: { parts: [{ text: JSON.stringify(fixture) }] } }] }
+      },
+    },
+  }
+  const report = await runIncidentScenario({
+    dryRun: false,
+    model: "gemini-3.5-flash",
+    inferenceRunner: new GeminiSignaturePreservingRunner(client),
+    timeoutMs: 2_000,
+  })
+  assert.equal(report.action.mitigationPhaseStarted, true)
+  assert.equal(report.action.requestedTool, "rollback_production")
+  assert.equal(report.action.intercepted, true)
+  assert.equal(report.action.executedTool, "request_corroboration")
+  assert.match(report.action.modelRecommendation ?? "", /targeted corroboration/)
+})
+
 test("explicit Dependency timeout degrades the role and terminates through the safe tool", async () => {
   const report = await runIncidentScenario({ dryRun: true, simulateDependencyTimeout: true })
   assert.deepEqual(report.degradedRoles, ["dependency"])
@@ -273,6 +770,8 @@ test("explicit Dependency timeout degrades the role and terminates through the s
 
 class ScriptedTwoPhaseInferenceRunner implements InferenceRunner {
   readonly mitigationPrompts: string[] = []
+  readonly phase1ToolNames: string[][] = []
+  readonly reasoningEfforts: Array<string | undefined> = []
 
   constructor(
     private readonly hangDependency = false,
@@ -280,6 +779,7 @@ class ScriptedTwoPhaseInferenceRunner implements InferenceRunner {
   ) {}
 
   async run(request: InferenceInput): Promise<InferenceOutput> {
+    this.reasoningEfforts.push(request.reasoningEffort)
     const items = request.context.getItems()
     const userMessages = items.flatMap((item) => {
       const candidate = item as unknown as { role?: string; content?: { text?: unknown } }
@@ -313,6 +813,7 @@ class ScriptedTwoPhaseInferenceRunner implements InferenceRunner {
         : prompt.includes("impact responder") ? "impact"
           : null
     assert.ok(role, `unexpected scripted inference prompt: ${prompt}`)
+    this.phase1ToolNames.push((request.tools ?? []).map((tool) => tool.name))
 
     if (role === "dependency" && this.hangDependency) {
       return await new Promise<InferenceOutput>(() => {})
@@ -336,10 +837,11 @@ class ScriptedTwoPhaseInferenceRunner implements InferenceRunner {
 }
 
 test("phase-1-only model runs settle as soon as all provider hypotheses complete", async () => {
+  const runner = new ScriptedTwoPhaseInferenceRunner()
   const report = await runIncidentScenario({
     dryRun: false,
     phase1Only: true,
-    inferenceRunner: new ScriptedTwoPhaseInferenceRunner(),
+    inferenceRunner: runner,
     timeoutMs: 2_000,
   })
 
@@ -348,6 +850,20 @@ test("phase-1-only model runs settle as soon as all provider hypotheses complete
   assert.equal(report.gateReason, "conflicting-evidence")
   assert.equal(report.timeline.some((item) => item.type === "incident.scenario.timeout"), false)
   assert.ok(report.elapsedMs < 2_000)
+  assert.equal(runner.phase1ToolNames.length, 3)
+  assert.deepEqual(runner.phase1ToolNames, [[], [], []])
+})
+
+test("opt-in reasoning effort is forwarded to every provider loop", async () => {
+  const runner = new ScriptedTwoPhaseInferenceRunner()
+  await runIncidentScenario({
+    dryRun: false,
+    phase1Only: true,
+    reasoningEffort: "none",
+    inferenceRunner: runner,
+    timeoutMs: 2_000,
+  })
+  assert.deepEqual(runner.reasoningEfforts, ["none", "none", "none"])
 })
 
 test("two-phase scripted model integration traverses the real post-aggregation interceptor", async () => {
@@ -380,7 +896,7 @@ test("two-phase scripted model integration traverses the real post-aggregation i
   assert.match(mitigationPrompt, /Safety Gate: blocked \(conflicting-evidence\)/)
 })
 
-test("approved evidence allows the proposal-only rollback path without interception", async () => {
+test("approved evidence allows the proposal-only rollback path without rewrite", async () => {
   const report = await runIncidentScenario({
     dryRun: false,
     inferenceRunner: new ScriptedTwoPhaseInferenceRunner(false, true),
@@ -396,6 +912,41 @@ test("approved evidence allows the proposal-only rollback path without intercept
   assert.equal(report.timeline.some((item) => item.type === "mozaik.interception.rewritten"), false)
   assert.ok(report.timeline.some((item) => item.type === "incident.action.rollback-tool-executed"))
   assert.match(report.action.modelRecommendation ?? "", /5% canary/)
+})
+
+test("seeded safety stress preserves the affirmative-approval crossing invariant", async () => {
+  const result = await runSafetyStress({ cases: 2_000, seed: 0x1cedb00c })
+  assert.equal(result.cases, 2_000)
+  assert.ok(result.approvedCrossings > 0)
+  assert.ok(result.blockedRewrites > 0)
+  assert.equal(result.unauthorizedRollbackCrossings, 0)
+  assert.equal(result.staleNonSafeCrossings, 0)
+  assert.equal(result.unauthorizedBoundedCrossings, 0)
+  assert.equal(result.actionPolicyInvariantViolations, 0)
+  assert.equal(result.attemptIsolationViolations, 0)
+  assert.ok(result.stalePlanAttempts > 0)
+  assert.equal(result.totalActionAttempts, 8_000)
+  assert.equal(result.snapshotMutationViolations, 0)
+  assert.deepEqual(result.invariantViolations, [])
+})
+
+test("phase-1-only degraded runs settle when the action-phase evidence window closes", async () => {
+  const runner = new ScriptedTwoPhaseInferenceRunner(true)
+  const report = await runIncidentScenario({
+    dryRun: false,
+    phase1Only: true,
+    inferenceRunner: runner,
+    timeoutMs: 1_000,
+    evidenceDeadlineMs: 100,
+  })
+
+  assert.deepEqual(report.degradedRoles, ["dependency"])
+  assert.deepEqual(report.hypotheses.map((item) => item.role).sort(), ["impact", "trace"])
+  assert.equal(report.gateDecision, "blocked")
+  assert.equal(report.gateReason, "incomplete-required-evidence")
+  assert.equal(report.action.mitigationPhaseStarted, false)
+  assert.equal(report.timeline.some((item) => item.type === "incident.scenario.timeout"), false)
+  assert.ok(report.elapsedMs < 1_000)
 })
 
 test("a generally hanging required model responder degrades at the evidence deadline", async () => {

@@ -3,7 +3,7 @@
 Upload the four PNGs in this order. Each is 1600 × 900 (16:9), under 5 MB.
 
 1. **jigjoy-01-cover.png** — Concurrent evidence blocks a rollback proposal; Mozaik rewrites it to corroboration.
-2. **jigjoy-02-ablation.png** — The same fail-closed policy produces different available safe plans when only scheduling changes.
+2. **jigjoy-02-ablation.png** — The same revision-1 bounded plan becomes stale only when concurrent peer evidence advances authoritative state during planning.
 3. **jigjoy-03-interception.png** — Canonical responder spans and the real Mozaik interception sequence.
 4. **jigjoy-04-safety-proof.png** — A timed-out required responder leaves evidence incomplete and rollback blocked.
 
@@ -21,11 +21,13 @@ node docs/gallery/render.mjs /absolute/path/to/playwright/index.mjs
 
 Alternatively omit the argument when `playwright` is resolvable in the local environment. Playwright is a presentation tool, not a new project dependency. The committed images were rendered with Playwright 1.63.0 and Chromium 153.0.8010.12; system font rendering can differ across platforms.
 
-The generator reads `docs/evidence/replay.json` without changing it. It also runs the existing assertion-backed `src/ablation.ts` and `src/degradation.ts` scripts and derives the comparison counts, gate reasons, timeout roles, and safe tool from their output. No causal proof files or runtime code are modified.
+To regenerate editable SVG sources without Playwright, use `node docs/gallery/render.mjs --svg-only`, then rasterize them in a local browser at 1600 × 900.
+
+The generator reads `docs/evidence/replay.json` without changing it. It also runs the assertion-backed safe-action, stale-plan, and degradation scripts and derives the displayed revisions, freshness, boundary results, timeout roles, and safe tool from their output.
 
 The replay image shows selected actual canonical events in recorded order. Bar lengths and hypothesis markers come from the committed replay, and the dashed line is its configured 205 ms action boundary. All printed event times are canonical deterministic-fixture times, not live callback timing or MTTR. `SafetyGateInterception` is the implementation class in `src/app.ts`, reached through Mozaik's `InterceptionHandler`.
 
-Both ablation arms block rollback. The concurrent case has all three hypotheses and conflicting evidence; the sequential case has one hypothesis and holds for missing evidence. Rollback is proposal-only. No authenticated provider run is claimed.
+Image two uses the deterministic stale-plan receipt: both planners start at revision 1 with the same bounded candidate. Concurrent peer evidence advances the boundary to revision 3 and invalidates it; the serialized proposal remains fresh at revision 1. The bounded canary is proposal-only, and neither arm authorizes destructive rollback.
 
 ## Visual review
 
@@ -33,4 +35,4 @@ Reviewed the live gallery and all 15 uploaded images across synod, ClaimScope, A
 
 Three passes: story and hierarchy; typography, spacing and brighter safe-action contrast; then reduction at 320 × 180 beside the five competing first images. The final cover uses one coral block event and a green rewrite strip. Its thumbnail communicates a consequence rather than requiring the reader to decode a dashboard. Center-cropping at 16:9 preserves the whole composition.
 
-Use all four now. Consider replacing image four only when a real authenticated provider receipt through the existing interception path is committed and independently verifiable.
+Use all four. The authenticated provider execution is documented in the repository receipt; image four remains the complementary degradation proof.

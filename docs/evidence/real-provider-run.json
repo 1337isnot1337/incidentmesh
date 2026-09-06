@@ -1,31 +1,31 @@
 {
   "schema": "incidentmesh.provider-evidence/v1",
-  "phase1Only": true,
-  "commit": "d2f50acb08c476e56f8975ebda11219b8fe3ce47",
+  "phase1Only": false,
+  "commit": "65d98f8feda666932fcbace88037c7009b487a35",
   "provider": "google",
-  "model": "gemini-3.5-flash",
-  "startedAt": "2026-09-06T05:22:18.110Z",
-  "completedAt": "2026-09-06T05:22:48.358Z",
+  "model": "gemini-3.5-flash-lite",
+  "startedAt": "2026-09-06T14:04:38.014Z",
+  "completedAt": "2026-09-06T14:04:41.443Z",
   "participants": [
     {
       "role": "trace",
       "startedAtMs": 2,
-      "completedAtMs": 2419
+      "completedAtMs": 1392
     },
     {
       "role": "dependency",
       "startedAtMs": 3,
-      "completedAtMs": 2881
+      "completedAtMs": 1584
     },
     {
       "role": "impact",
       "startedAtMs": 3,
-      "completedAtMs": 2602
+      "completedAtMs": 1468
     }
   ],
   "events": [
     {
-      "atMs": 1,
+      "atMs": 2,
       "type": "incident.opened",
       "producer": "Incident Commander",
       "detail": "incident.opened"
@@ -52,121 +52,187 @@
       "atMs": 4,
       "type": "mozaik.inference.started",
       "producer": "Trace",
-      "detail": "inference.started gemini-3.5-flash"
+      "detail": "inference.started gemini-3.5-flash-lite"
     },
     {
-      "atMs": 5,
+      "atMs": 4,
       "type": "mozaik.inference.started",
       "producer": "Dependency",
-      "detail": "inference.started gemini-3.5-flash"
+      "detail": "inference.started gemini-3.5-flash-lite"
     },
     {
-      "atMs": 5,
+      "atMs": 4,
       "type": "mozaik.inference.started",
       "producer": "Impact",
-      "detail": "inference.started gemini-3.5-flash"
+      "detail": "inference.started gemini-3.5-flash-lite"
     },
     {
-      "atMs": 2418,
+      "atMs": 1392,
       "type": "mozaik.inference.completed",
       "producer": "Trace",
       "detail": "inference.completed provider model"
     },
     {
-      "atMs": 2418,
+      "atMs": 1392,
       "type": "incident.hypothesis.emitted",
       "producer": "Trace",
-      "detail": "Trace analysis of checkout-api-us-east indicates a critical latency spike and high error rates tracing back to upstream connection pool exhaustion in the payment-processor downstream dependency."
+      "detail": "Recent deployment introduced a synchronous deadlock in the checkout payment validation flow."
     },
     {
-      "atMs": 2419,
+      "atMs": 1392,
       "type": "awareness.peer-observed",
       "producer": "Dependency",
       "detail": "Dependency observed trace hypothesis"
     },
     {
-      "atMs": 2419,
+      "atMs": 1392,
       "type": "awareness.peer-observed",
       "producer": "Impact",
       "detail": "Impact observed trace hypothesis"
     },
     {
-      "atMs": 2419,
+      "atMs": 1392,
       "type": "incident.span.completed",
       "producer": "Trace",
       "detail": "model response complete"
     },
     {
-      "atMs": 2602,
+      "atMs": 1468,
       "type": "mozaik.inference.completed",
       "producer": "Impact",
       "detail": "inference.completed provider model"
     },
     {
-      "atMs": 2602,
+      "atMs": 1468,
       "type": "incident.hypothesis.emitted",
       "producer": "Impact",
-      "detail": "Spike in response times on checkout-api-us-east is causing a 12% drop in successful checkouts, primarily impacting users attempting credit card transactions in the US-East region."
+      "detail": "Customer checkout API requests in us-east are failing due to a recent bad deployment in the checkout-api service."
     },
     {
-      "atMs": 2602,
+      "atMs": 1468,
       "type": "awareness.peer-observed",
       "producer": "Trace",
       "detail": "Trace observed impact hypothesis"
     },
     {
-      "atMs": 2602,
+      "atMs": 1468,
       "type": "awareness.peer-observed",
       "producer": "Dependency",
       "detail": "Dependency observed impact hypothesis"
     },
     {
-      "atMs": 2602,
+      "atMs": 1468,
       "type": "incident.span.completed",
       "producer": "Impact",
       "detail": "model response complete"
     },
     {
-      "atMs": 2881,
+      "atMs": 1583,
       "type": "mozaik.inference.completed",
       "producer": "Dependency",
       "detail": "inference.completed provider model"
     },
     {
-      "atMs": 2881,
+      "atMs": 1583,
       "type": "incident.hypothesis.emitted",
       "producer": "Dependency",
-      "detail": "A recent deployment of checkout-api-us-east introduced an incompatible library dependency, leading to cascading failures in the checkout pipeline."
+      "detail": "Dependency health check indicates external payment gateway timeout causing checkout-api-us-east errors."
     },
     {
-      "atMs": 2881,
+      "atMs": 1583,
       "type": "incident.gate.decision",
       "producer": "Safety Gate",
-      "detail": "blocked: conflicting-evidence; 2 contradictions across 3 hypotheses; confidence 0.83 (evidence-aggregation)"
+      "detail": "blocked: conflicting-evidence; 2 contradictions across 3 hypotheses; confidence 0.85 (evidence-aggregation)"
     },
     {
-      "atMs": 2881,
+      "atMs": 1583,
+      "type": "incident.mitigation.phase-started",
+      "producer": "Action Controller",
+      "detail": "Phase 2 mitigation loop started with 3 shared hypotheses and gate=blocked"
+    },
+    {
+      "atMs": 1584,
       "type": "awareness.peer-observed",
       "producer": "Trace",
       "detail": "Trace observed dependency hypothesis"
     },
     {
-      "atMs": 2881,
+      "atMs": 1584,
       "type": "awareness.peer-observed",
       "producer": "Impact",
       "detail": "Impact observed dependency hypothesis"
     },
     {
-      "atMs": 2881,
+      "atMs": 1584,
       "type": "incident.span.completed",
       "producer": "Dependency",
       "detail": "model response complete"
     },
     {
-      "atMs": 30009,
-      "type": "incident.scenario.timeout",
-      "producer": "Incident Console",
-      "detail": "scenario did not settle within 30000ms"
+      "atMs": 1584,
+      "type": "mozaik.inference.started",
+      "producer": "Action Controller",
+      "detail": "inference.started gemini-3.5-flash-lite"
+    },
+    {
+      "atMs": 2159,
+      "type": "mozaik.inference.completed",
+      "producer": "Action Controller",
+      "detail": "inference.completed provider model"
+    },
+    {
+      "atMs": 2159,
+      "type": "mozaik.interception.started",
+      "producer": "Action Controller",
+      "detail": "InterceptionHandler received rollback_production"
+    },
+    {
+      "atMs": 2159,
+      "type": "mozaik.interception.rewritten",
+      "producer": "Safety Gate",
+      "detail": "rewrote rollback_production -> request_corroboration (conflicting-evidence)"
+    },
+    {
+      "atMs": 2159,
+      "type": "mozaik.interception.finished",
+      "producer": "Action Controller",
+      "detail": "InterceptionHandler returned request_corroboration"
+    },
+    {
+      "atMs": 2159,
+      "type": "mozaik.function-call.started",
+      "producer": "Action Controller",
+      "detail": "Mozaik executing request_corroboration"
+    },
+    {
+      "atMs": 2159,
+      "type": "incident.action.safe-executed",
+      "producer": "Action Controller",
+      "detail": "safe tool executed for blocked rollback_production"
+    },
+    {
+      "atMs": 2159,
+      "type": "mozaik.function-call.completed",
+      "producer": "Action Controller",
+      "detail": "Mozaik function tool completed"
+    },
+    {
+      "atMs": 2159,
+      "type": "mozaik.inference.started",
+      "producer": "Action Controller",
+      "detail": "inference.started gemini-3.5-flash-lite"
+    },
+    {
+      "atMs": 3176,
+      "type": "mozaik.inference.completed",
+      "producer": "Action Controller",
+      "detail": "inference.completed provider model"
+    },
+    {
+      "atMs": 3176,
+      "type": "incident.mitigation.replanned",
+      "producer": "Action Controller",
+      "detail": "Because the Safety Gate has blocked the proposed production rollback due to conflicting evidence and contradictions among the independent responder models (`payment-validation-deadlock` vs. `bad-deployment` vs. `external-gateway-timeout`), corroboration is required before proceeding with destructive production actions. \n\n**Final Recommendation:**\nDo not execute a blind rollback immediately. Instead, prioritize rapid corroboration by verifying whether the external payment gateway is timing out or if the recent deployment introduced a synchronous deadlock in `checkout-api`. Once the telemetry confirms the primary root cause, execute the corresponding targeted remediation."
     }
   ],
   "overlap": {
@@ -177,105 +243,185 @@
           "trace",
           "dependency"
         ],
-        "overlapMs": 2416
+        "overlapMs": 1389
       },
       {
         "roles": [
           "trace",
           "impact"
         ],
-        "overlapMs": 2416
+        "overlapMs": 1389
       },
       {
         "roles": [
           "dependency",
           "impact"
         ],
-        "overlapMs": 2599
+        "overlapMs": 1465
       }
     ]
   },
+  "peerAwareness": [
+    {
+      "atMs": 1392,
+      "observer": "dependency",
+      "sourceRole": "trace",
+      "activeDuringOwnInference": true
+    },
+    {
+      "atMs": 1392,
+      "observer": "impact",
+      "sourceRole": "trace",
+      "activeDuringOwnInference": true
+    },
+    {
+      "atMs": 1468,
+      "observer": "trace",
+      "sourceRole": "impact",
+      "activeDuringOwnInference": false
+    },
+    {
+      "atMs": 1468,
+      "observer": "dependency",
+      "sourceRole": "impact",
+      "activeDuringOwnInference": true
+    },
+    {
+      "atMs": 1584,
+      "observer": "trace",
+      "sourceRole": "dependency",
+      "activeDuringOwnInference": false
+    },
+    {
+      "atMs": 1584,
+      "observer": "impact",
+      "sourceRole": "dependency",
+      "activeDuringOwnInference": false
+    }
+  ],
   "gateDecision": "blocked",
-  "interceptionObserved": false,
+  "interceptionObserved": true,
   "action": {
-    "proposed": false,
-    "requestedTool": null,
-    "boundaryMs": 205,
-    "attemptedAtMs": null,
-    "gateAtBoundary": null,
-    "gateReasonAtBoundary": null,
-    "hypothesesAtBoundary": 0,
-    "contradictionsAtBoundary": 0,
-    "boundarySnapshot": null,
-    "boundarySafeAction": null,
-    "actionableSafePlan": null,
-    "actionableSafePlanAtMs": null,
-    "intercepted": false,
-    "executedTool": null,
-    "mitigationPhaseStarted": false,
-    "modelRecommendation": null
+    "proposed": true,
+    "requestedTool": "rollback_production",
+    "boundaryMs": null,
+    "attemptedAtMs": 2159,
+    "gateAtBoundary": "blocked",
+    "gateReasonAtBoundary": "conflicting-evidence",
+    "hypothesesAtBoundary": 3,
+    "contradictionsAtBoundary": 2,
+    "boundarySnapshot": {
+      "atMs": 2159,
+      "investigationDecision": "blocked",
+      "investigationReason": "conflicting-evidence",
+      "decision": "blocked",
+      "reason": "conflicting-evidence",
+      "availableRoles": [
+        "trace",
+        "dependency",
+        "impact"
+      ],
+      "missingRequiredRoles": [],
+      "degradedRoles": [],
+      "confidence": 0.85,
+      "contradictions": 2,
+      "proposedAction": "rollback_production"
+    },
+    "boundarySafeAction": "canary-with-targeted-corroboration",
+    "actionableSafePlan": "canary-with-targeted-corroboration",
+    "actionableSafePlanAtMs": 2159,
+    "intercepted": true,
+    "executedTool": "request_corroboration",
+    "mitigationPhaseStarted": true,
+    "modelRecommendation": "Because the Safety Gate has blocked the proposed production rollback due to conflicting evidence and contradictions among the independent responder models (`payment-validation-deadlock` vs. `bad-deployment` vs. `external-gateway-timeout`), corroboration is required before proceeding with destructive production actions. \n\n**Final Recommendation:**\nDo not execute a blind rollback immediately. Instead, prioritize rapid corroboration by verifying whether the external payment gateway is timing out or if the recent deployment introduced a synchronous deadlock in `checkout-api`. Once the telemetry confirms the primary root cause, execute the corresponding targeted remediation."
   },
   "hypotheses": [
     {
       "role": "trace",
-      "claim": "Trace analysis of checkout-api-us-east indicates a critical latency spike and high error rates tracing back to upstream connection pool exhaustion in the payment-processor downstream dependency.",
+      "claim": "Recent deployment introduced a synchronous deadlock in the checkout payment validation flow.",
       "confidence": 0.85,
-      "rootCause": "downstream_dependency_exhaustion",
-      "atMs": 2419
+      "rootCause": "payment-validation-deadlock",
+      "atMs": 1392
     },
     {
       "role": "impact",
-      "claim": "Spike in response times on checkout-api-us-east is causing a 12% drop in successful checkouts, primarily impacting users attempting credit card transactions in the US-East region.",
+      "claim": "Customer checkout API requests in us-east are failing due to a recent bad deployment in the checkout-api service.",
       "confidence": 0.85,
-      "rootCause": "dependency_latency_spike",
-      "atMs": 2602
+      "rootCause": "bad-deployment",
+      "atMs": 1468
     },
     {
       "role": "dependency",
-      "claim": "A recent deployment of checkout-api-us-east introduced an incompatible library dependency, leading to cascading failures in the checkout pipeline.",
-      "confidence": 0.8,
-      "rootCause": "broken_dependency_upgrade",
-      "atMs": 2881
+      "claim": "Dependency health check indicates external payment gateway timeout causing checkout-api-us-east errors.",
+      "confidence": 0.85,
+      "rootCause": "external-gateway-timeout",
+      "atMs": 1583
     }
   ],
-  "adaptations": [],
+  "adaptations": [
+    "Action Controller model recommendation: Because the Safety Gate has blocked the proposed production rollback due to conflicting evidence and contradictions among the independent responder models (`payment-validation-deadlock` vs. `bad-deployment` vs. `external-gateway-timeout`), corroboration is required before proceeding with destructive production actions. \n\n**Final Recommendation:**\nDo not execute a blind rollback immediately. Instead, prioritize rapid corroboration by verifying whether the external payment gateway is timing out or if the recent deployment introduced a synchronous deadlock in `checkout-api`. Once the telemetry confirms the primary root cause, execute the corresponding targeted remediation."
+  ],
   "evidence": [],
-  "reportElapsedMs": 30009,
+  "reportElapsedMs": 3177,
   "inferenceEvents": [
     {
       "atMs": 4,
       "type": "mozaik.inference.started",
       "producer": "Trace",
-      "detail": "inference.started gemini-3.5-flash"
+      "detail": "inference.started gemini-3.5-flash-lite"
     },
     {
-      "atMs": 5,
+      "atMs": 4,
       "type": "mozaik.inference.started",
       "producer": "Dependency",
-      "detail": "inference.started gemini-3.5-flash"
+      "detail": "inference.started gemini-3.5-flash-lite"
     },
     {
-      "atMs": 5,
+      "atMs": 4,
       "type": "mozaik.inference.started",
       "producer": "Impact",
-      "detail": "inference.started gemini-3.5-flash"
+      "detail": "inference.started gemini-3.5-flash-lite"
     },
     {
-      "atMs": 2418,
+      "atMs": 1392,
       "type": "mozaik.inference.completed",
       "producer": "Trace",
       "detail": "inference.completed provider model"
     },
     {
-      "atMs": 2602,
+      "atMs": 1468,
       "type": "mozaik.inference.completed",
       "producer": "Impact",
       "detail": "inference.completed provider model"
     },
     {
-      "atMs": 2881,
+      "atMs": 1583,
       "type": "mozaik.inference.completed",
       "producer": "Dependency",
+      "detail": "inference.completed provider model"
+    },
+    {
+      "atMs": 1584,
+      "type": "mozaik.inference.started",
+      "producer": "Action Controller",
+      "detail": "inference.started gemini-3.5-flash-lite"
+    },
+    {
+      "atMs": 2159,
+      "type": "mozaik.inference.completed",
+      "producer": "Action Controller",
+      "detail": "inference.completed provider model"
+    },
+    {
+      "atMs": 2159,
+      "type": "mozaik.inference.started",
+      "producer": "Action Controller",
+      "detail": "inference.started gemini-3.5-flash-lite"
+    },
+    {
+      "atMs": 3176,
+      "type": "mozaik.inference.completed",
+      "producer": "Action Controller",
       "detail": "inference.completed provider model"
     }
   ],

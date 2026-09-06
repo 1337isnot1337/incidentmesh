@@ -1,0 +1,90 @@
+import { type Hypothesis } from "./app.js";
+export type FrozenHypothesis = Pick<Hypothesis, "role" | "claim" | "confidence" | "rootCause">;
+export type StaleAttemptProof = {
+    attemptId: string;
+    planId: string;
+    basedOnRevision: number;
+    boundaryRevision: number;
+    fresh: boolean;
+    proposedAction: string;
+    actionRisk: string;
+    gateDecision: string;
+    gateReason: string;
+    policyDecision: string;
+    policyReason: string;
+    availableRoles: readonly string[];
+    missingRequiredRoles: readonly string[];
+    degradedRoles: readonly string[];
+    perRoleConfidence: Readonly<Record<string, number | null>>;
+    contradictions: number;
+    targetCause: string | null;
+};
+export type StalePlanArm = {
+    schedule: "concurrent" | "sequential";
+    firstPlanningRevision: number;
+    candidateAction: "targeted_canary_probe";
+    targetCause: string;
+    peerEvidenceDuringPlanning: boolean;
+    boundaryRevision: number;
+    proposalFresh: boolean;
+    policyDecision: "approved" | "blocked";
+    policyReason: string;
+    boundedActionCrossed: boolean;
+    executedAction: string | null;
+    mozaikInterceptionObserved: boolean;
+    proposalRewritten: boolean;
+    safeToolExecuted: boolean;
+    finalDecisionRevision: number;
+    finalHypotheses: FrozenHypothesis[];
+    finalGateDecision: string;
+    finalGateReason: string;
+    staleEventObserved: boolean;
+    freshReplan: null | {
+        basedOnRevision: number;
+        boundaryRevision: number;
+        policyDecision: "approved" | "blocked";
+        policyReason: string;
+        executedAction: string | null;
+    };
+    rollbackAuthorizedByFinalStrictGate: boolean;
+    attempts: StaleAttemptProof[];
+};
+export type StalePlanAblationReport = {
+    schema: "incidentmesh.stale-plan-ablation/v1";
+    source: {
+        receipt: string;
+        commit: string;
+        provider: string;
+        model: string;
+    };
+    fixedInputs: {
+        incident: string;
+        eventualEvidence: FrozenHypothesis[];
+        planner: string;
+        candidateAction: "targeted_canary_probe";
+        candidateTargetCause: string;
+        actionPolicy: string;
+        proposalBoundary: string;
+    };
+    changedVariable: "peer-evidence scheduling relative to the same in-flight plan";
+    concurrent: StalePlanArm;
+    sequential: StalePlanArm;
+    invariants: {
+        sameEventualEvidence: boolean;
+        sameFirstPlanningRevision: boolean;
+        sameCandidateAction: boolean;
+        concurrentProposalInvalidatedAsStale: boolean;
+        concurrentFreshReplanSeesConflict: boolean;
+        sequentialProposalCrossedWhileFresh: boolean;
+        unauthorizedRollbackCrossings: number;
+        staleNonSafeCrossings: number;
+    };
+    causalFinding: string;
+    limitation: string;
+};
+type Source = StalePlanAblationReport["source"];
+export declare function runStalePlanAblation(input: {
+    source: Source;
+    evidence: readonly FrozenHypothesis[];
+}): Promise<StalePlanAblationReport>;
+export {};

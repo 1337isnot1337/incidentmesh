@@ -6,7 +6,10 @@ const PROVIDER_CREDENTIALS = {
     deepseek: ["DEEPSEEK_API_KEY"],
 };
 export function providerPreflight(model, env) {
-    const specification = supportedModels.find((candidate) => candidate.specification.name === model)?.specification;
+    const specification = supportedModels.find((candidate) => candidate.specification.name === model)?.specification
+        ?? (model === "gemini-3.5-flash-lite"
+            ? supportedModels.find((candidate) => candidate.specification.name === "gemini-3.5-flash")?.specification
+            : undefined);
     if (!specification) {
         return { ok: false, model, provider: null, acceptedCredentialNames: [], error: "unsupported_model" };
     }

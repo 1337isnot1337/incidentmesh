@@ -1,0 +1,57 @@
+{
+  "schema": "incidentmesh.provider-derived-ablation/v1",
+  "source": {
+    "receipt": "docs/evidence/real-provider-run.json",
+    "commit": "65d98f8feda666932fcbace88037c7009b487a35",
+    "provider": "google",
+    "model": "gemini-3.5-flash-lite"
+  },
+  "fixedInputs": {
+    "incident": "checkout-api-us-east",
+    "evidence": [
+      {
+        "role": "dependency",
+        "claim": "Dependency health check indicates external payment gateway timeout causing checkout-api-us-east errors.",
+        "confidence": 0.85,
+        "rootCause": "external-gateway-timeout"
+      },
+      {
+        "role": "impact",
+        "claim": "Customer checkout API requests in us-east are failing due to a recent bad deployment in the checkout-api service.",
+        "confidence": 0.85,
+        "rootCause": "bad-deployment"
+      },
+      {
+        "role": "trace",
+        "claim": "Recent deployment introduced a synchronous deadlock in the checkout payment validation flow.",
+        "confidence": 0.85,
+        "rootCause": "payment-validation-deadlock"
+      }
+    ],
+    "proposedAction": "rollback_production",
+    "actionBoundaryMs": 205,
+    "gatePolicy": "rollback crosses only on affirmative approval; incomplete or conflicting evidence blocks"
+  },
+  "changedVariable": "evidence scheduling only",
+  "concurrent": {
+    "hypothesesAtBoundary": 3,
+    "contradictionsAtBoundary": 2,
+    "gateAtBoundary": "blocked",
+    "gateReasonAtBoundary": "conflicting-evidence",
+    "safeActionAtBoundary": "canary-with-targeted-corroboration",
+    "intercepted": true,
+    "executedTool": "request_corroboration"
+  },
+  "sequential": {
+    "hypothesesAtBoundary": 1,
+    "contradictionsAtBoundary": 0,
+    "gateAtBoundary": "blocked",
+    "gateReasonAtBoundary": "incomplete-required-evidence",
+    "safeActionAtBoundary": "hold-for-missing-evidence",
+    "intercepted": true,
+    "executedTool": "request_corroboration"
+  },
+  "hypothesesStableAcrossArms": true,
+  "unauthorizedRollbackCrossing": false,
+  "limitation": "Provider hypotheses are frozen from one authenticated receipt; scheduling is replayed deterministically and does not claim the live provider calls were deterministically scheduled."
+}

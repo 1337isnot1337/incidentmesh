@@ -1,0 +1,17 @@
+# Final judge Q&A
+
+| Question | Short answer | Show |
+| --- | --- | --- |
+| What runs concurrently? | Trace, Dependency, and Impact are independent Mozaik participants. One authenticated Gemini Flash-Lite receipt records all three provider inference windows overlapping for 1,389 ms. | [`../evidence/real-provider-run.md`](../evidence/real-provider-run.md) |
+| Is authenticated Phase 2 proven? | Yes, for one bounded historical capture: provider Action Controller rollback proposal → real SafetyGateInterception → request_corroboration → provider follow-up. | Same receipt |
+| What is the causal result? | The same revision-1 bounded plan returns stale at revision 3 only when peers progress concurrently; serialization leaves it fresh at revision 1. The final evidence is identical. | [`../evidence/stale-plan-ablation.md`](../evidence/stale-plan-ablation.md) |
+| Are prompts dynamically updated? | No. The plan freezes the evidence/revision used by its prompt. Correctness comes from rechecking revision at the action boundary. | [`../implementation.md`](../implementation.md) |
+| Why can partial evidence permit anything? | Only a bounded, reversible, proposal-only diagnostic probe may pass with one strong consistent signal. Destructive rollback still requires all roles, no degradation, per-role confidence, consistency, provenance, and freshness. | [`../../src/app.ts`](../../src/app.ts) |
+| Can a stale action cross? | No stale bounded or destructive proposal can cross. The 10,000-case stress exercises 40,000 attempts with zero stale non-safe crossings. | [`../evidence/safety-stress.md`](../evidence/safety-stress.md) |
+| Is the gate always block? | No. Complete consistent high-confidence evidence lets the fresh proposal-only rollback pass unchanged. | Focused approved-path test |
+| Can live state override a frozen decision? | No. Every attempt has a distinct immutable snapshot and authorization uses that attempt only. | Focused snapshot/attempt tests |
+| What if a responder disappears? | It is closed/degraded, revision advances, missing evidence is not approval, and rollback remains blocked. Late closed-role output cannot restore authority. | [`../evidence/degradation.md`](../evidence/degradation.md) |
+| Does anything touch production? | No. Both action fixtures are proposal-only; the project proves orchestration and enforcement. | [`../implementation.md`](../implementation.md) |
+| Is this production-ready or an MTTR result? | No. It is a rigorously tested prototype with deterministic counterfactuals and one authenticated historical receipt. | README limitations |
+
+Never say that serialization permits destructive rollback, that an in-flight Phase-1 prompt receives peer evidence, or that fixture timing is production latency.

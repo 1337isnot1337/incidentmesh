@@ -1,0 +1,55 @@
+{
+  "schema": "incidentmesh.safe-action-ablation/v1",
+  "experiment": "fail-closed action-boundary evidence scheduling ablation",
+  "constants": {
+    "incident": "checkout-api-us-east",
+    "evidence": [
+      {
+        "role": "dependency",
+        "claim": "deploy 8f3 correlates with database-pool wait and queue growth",
+        "confidence": 0.82,
+        "rootCause": "deploy-8f3"
+      },
+      {
+        "role": "impact",
+        "claim": "38% of checkout attempts fail for users in us-east",
+        "confidence": 0.88,
+        "rootCause": "regional-impact"
+      },
+      {
+        "role": "trace",
+        "claim": "p95 latency jumped on checkout requests before the error spike",
+        "confidence": 0.85,
+        "rootCause": "cache-stampede"
+      }
+    ],
+    "gatePolicy": "rollback may cross only on affirmative approval; incomplete required evidence blocks at the action boundary; complete contradictory evidence blocks for conflict",
+    "proposedAction": "rollback_production",
+    "actionBoundaryMs": 205
+  },
+  "changedVariable": "evidence scheduling only",
+  "concurrent": {
+    "hypothesesAtBoundary": 3,
+    "contradictionsAtBoundary": 2,
+    "gateAtBoundary": "blocked",
+    "gateReasonAtBoundary": "conflicting-evidence",
+    "safeActionAtBoundary": "canary-with-targeted-corroboration",
+    "intercepted": true,
+    "executedTool": "request_corroboration",
+    "finalGate": "blocked",
+    "finalGateReason": "conflicting-evidence"
+  },
+  "sequential": {
+    "hypothesesAtBoundary": 1,
+    "contradictionsAtBoundary": 0,
+    "gateAtBoundary": "blocked",
+    "gateReasonAtBoundary": "incomplete-required-evidence",
+    "safeActionAtBoundary": "hold-for-missing-evidence",
+    "intercepted": true,
+    "executedTool": "request_corroboration",
+    "finalGate": "blocked",
+    "finalGateReason": "conflicting-evidence"
+  },
+  "causalFinding": "Same evidence, gate, rollback proposal, and deadline. Parallel scheduling exposes the conflict before the boundary and makes the targeted canary plan actionable immediately; serialized scheduling leaves required evidence missing, so the same fail-closed gate holds the action until the conflict becomes visible later.",
+  "limitation": "The rollback tool is proposal-only. The configured boundary and observed ordering are deterministic fixture behavior, not MTTR or a production speedup claim."
+}

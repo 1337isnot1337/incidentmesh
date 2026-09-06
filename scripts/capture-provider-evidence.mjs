@@ -16,7 +16,7 @@ function usage() {
   console.log([
     "usage:",
     "  node scripts/capture-provider-evidence.mjs --check [--model <model>]",
-    "  node scripts/capture-provider-evidence.mjs --execute [--model <model>] [--phase1-only]",
+    "  node scripts/capture-provider-evidence.mjs --execute [--model <model>] [--phase1-only] [--reasoning-effort <level>] [--gemini-signature-compat]",
     "",
     "--check inspects only model/provider selection and credential variable names.",
     "--execute performs one bounded real-model IncidentMesh run and writes evidence only on success.",
@@ -27,6 +27,8 @@ function parseArgs(argv) {
   let mode = "check"
   let model = defaultModel
   let phase1Only = false
+  let reasoningEffort
+  let geminiSignatureCompat = false
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i]
     if (arg === "--help" || arg === "-h") return { help: true, mode, model }
@@ -36,9 +38,14 @@ function parseArgs(argv) {
       model = argv[++i]
       if (!model) throw new Error("--model requires a value")
     } else if (arg === "--phase1-only") phase1Only = true
+    else if (arg === "--reasoning-effort") {
+      reasoningEffort = argv[++i]
+      if (!reasoningEffort) throw new Error("--reasoning-effort requires a value")
+    }
+    else if (arg === "--gemini-signature-compat") geminiSignatureCompat = true
     else throw new Error(`unknown argument: ${arg}`)
   }
-  return { help: false, mode, model, phase1Only }
+  return { help: false, mode, model, phase1Only, reasoningEffort, geminiSignatureCompat }
 }
 
 function providerForModel(model) {
@@ -220,13 +227,17 @@ async function main() {
 
   const commit = git("rev-parse", "HEAD")
   const startedAt = new Date().toISOString()
-  const command = `RUN_MODEL=1 DRY_RUN=0 PHASE1_ONLY=${args.phase1Only ? 1 : 0} MODEL=${args.model} node dist/index.js`
+  const reasoningPrefix = args.reasoningEffort ? ` MODEL_REASONING_EFFORT=${args.reasoningEffort}` : ""
+  const compatPrefix = args.geminiSignatureCompat ? " GEMINI_SIGNATURE_COMPAT=1" : ""
+  const command = `RUN_MODEL=1 DRY_RUN=0 PHASE1_ONLY=${args.phase1Only ? 1 : 0} MODEL=${args.model}${reasoningPrefix}${compatPrefix} node dist/index.js`
   const result = await runChild(process.execPath, [join(projectRoot, "dist", "index.js")], {
     ...process.env,
     RUN_MODEL: "1",
     DRY_RUN: "0",
     PHASE1_ONLY: args.phase1Only ? "1" : "0",
     MODEL: args.model,
+    ...(args.reasoningEffort ? { MODEL_REASONING_EFFORT: args.reasoningEffort } : {}),
+    ...(args.geminiSignatureCompat ? { GEMINI_SIGNATURE_COMPAT: "1" } : {}),
   }, timeoutMs)
   const completedAt = new Date().toISOString()
 
@@ -238,6 +249,9 @@ async function main() {
   }
 
   const report = parseReport(result.stdout)
+  if (report.timeline?.some((item) => item.type === "incident.scenario.timeout")) {
+    throw new Error("provider scenario reported incident.scenario.timeout; no evidence files were written")
+  }
   const mozaikVersion = packageVersion("@mozaik-ai/core")
   const limitations = [
     "The report exposes IncidentMesh incident events, not raw provider request/response bodies or authorization metadata.",

@@ -1,0 +1,25 @@
+{
+  "schema": "incidentmesh.degradation/v1",
+  "scenario": "dependency responder timeout",
+  "degradedRoles": [
+    "dependency"
+  ],
+  "hypothesesAvailable": [
+    "trace",
+    "impact"
+  ],
+  "gateAtBoundary": "blocked",
+  "gateReasonAtBoundary": "incomplete-required-evidence",
+  "missingRequiredRoles": [
+    "dependency"
+  ],
+  "safeActionAtBoundary": "hold-for-missing-evidence",
+  "intercepted": true,
+  "executedTool": "request_corroboration",
+  "finalGate": "blocked",
+  "finalGateReason": "incomplete-required-evidence",
+  "followupEvidence": [
+    "Trace supplied surviving-signal corroboration for the degraded hold"
+  ],
+  "finding": "Dependency is explicitly degraded after missing required evidence. The same fail-closed action policy intercepts rollback through Mozaik and requests surviving-signal corroboration instead of treating missing evidence as approval."
+}

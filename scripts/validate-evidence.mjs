@@ -22,17 +22,174 @@ function usage() {
   console.log("usage: node scripts/validate-evidence.mjs <evidence.json|evidence.md> [...]")
 }
 
+const responderNames = new Map([
+  ["trace", "Trace"],
+  ["dependency", "Dependency"],
+  ["impact", "Impact"],
+])
+
+function assertFiniteTime(value, label, displayPath) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    throw new Error(`${displayPath}: ${label} must be a finite non-negative number`)
+  }
+}
+
 function assertEvidenceShape(file, displayPath, text) {
   if (!file.endsWith(".json")) return
   const value = JSON.parse(text)
+  if (value?.schema === "incidentmesh.safety-stress/v1") {
+    for (const key of ["seed", "cases", "approvedSnapshots", "blockedSnapshots", "approvedCrossings", "blockedRewrites", "unauthorizedRollbackCrossings", "staleNonSafeCrossings", "unauthorizedBoundedCrossings", "actionPolicyInvariantViolations", "attemptIsolationViolations", "snapshotMutationViolations", "invariantViolations"]) {
+      if (!(key in value)) throw new Error(`${displayPath}: missing required safety-stress field ${key}`)
+    }
+    if (!Array.isArray(value.invariantViolations)) throw new Error(`${displayPath}: invariantViolations must be an array`)
+    if (value.unauthorizedRollbackCrossings !== 0 || value.staleNonSafeCrossings !== 0
+      || value.unauthorizedBoundedCrossings !== 0 || value.actionPolicyInvariantViolations !== 0
+      || value.attemptIsolationViolations !== 0 || value.snapshotMutationViolations !== 0
+      || value.invariantViolations.length !== 0) {
+      throw new Error(`${displayPath}: safety-stress evidence contains invariant violations`)
+    }
+    return
+  }
+  if (value?.schema === "incidentmesh.stale-plan-ablation/v1") {
+    for (const key of ["source", "fixedInputs", "changedVariable", "concurrent", "sequential", "invariants", "causalFinding", "limitation"]) {
+      if (!(key in value)) throw new Error(`${displayPath}: missing required stale-plan field ${key}`)
+    }
+    const invariants = value.invariants
+    if (invariants?.sameEventualEvidence !== true || invariants?.sameFirstPlanningRevision !== true
+      || invariants?.sameCandidateAction !== true || invariants?.concurrentProposalInvalidatedAsStale !== true
+      || invariants?.concurrentFreshReplanSeesConflict !== true
+      || invariants?.sequentialProposalCrossedWhileFresh !== true
+      || invariants?.unauthorizedRollbackCrossings !== 0 || invariants?.staleNonSafeCrossings !== 0) {
+      throw new Error(`${displayPath}: stale-plan causal invariants failed`)
+    }
+    if (value.changedVariable !== "peer-evidence scheduling relative to the same in-flight plan"
+      || value.concurrent?.firstPlanningRevision !== value.sequential?.firstPlanningRevision
+      || value.concurrent?.candidateAction !== value.sequential?.candidateAction
+      || value.concurrent?.proposalFresh !== false || value.concurrent?.boundedActionCrossed !== false
+      || value.concurrent?.mozaikInterceptionObserved !== true || value.concurrent?.proposalRewritten !== true
+      || value.concurrent?.safeToolExecuted !== true
+      || value.sequential?.proposalFresh !== true || value.sequential?.boundedActionCrossed !== true) {
+      throw new Error(`${displayPath}: stale-plan arms do not match the controlled theorem`)
+    }
+    return
+  }
+  if (value?.schema === "incidentmesh.safe-action-ablation/v1") {
+    if (value.changedVariable !== "evidence scheduling only"
+      || value.concurrent?.gateAtBoundary !== "blocked"
+      || value.sequential?.gateAtBoundary !== "blocked"
+      || value.concurrent?.gateReasonAtBoundary !== "conflicting-evidence"
+      || value.sequential?.gateReasonAtBoundary !== "incomplete-required-evidence"
+      || value.concurrent?.executedTool !== "request_corroboration"
+      || value.sequential?.executedTool !== "request_corroboration") {
+      throw new Error(`${displayPath}: safe-action ablation invariants failed`)
+    }
+    return
+  }
+  if (value?.schema === "incidentmesh.degradation/v1") {
+    if (value.gateAtBoundary !== "blocked" || value.gateReasonAtBoundary !== "incomplete-required-evidence"
+      || value.executedTool !== "request_corroboration" || value.finalGate !== "blocked"
+      || !Array.isArray(value.degradedRoles) || value.degradedRoles.length === 0) {
+      throw new Error(`${displayPath}: degradation safety invariants failed`)
+    }
+    return
+  }
+  if (value?.schema === "incidentmesh.provider-derived-ablation/v1") {
+    for (const key of ["source", "fixedInputs", "changedVariable", "concurrent", "sequential", "hypothesesStableAcrossArms", "unauthorizedRollbackCrossing"]) {
+      if (!(key in value)) throw new Error(`${displayPath}: missing required provider-derived field ${key}`)
+    }
+    if (value.hypothesesStableAcrossArms !== true || value.unauthorizedRollbackCrossing !== false) {
+      throw new Error(`${displayPath}: provider-derived causal invariants failed`)
+    }
+    return
+  }
+  if (value?.schema === "incidentmesh.semantic-stability/v2") {
+    for (const key of ["repetitionsPerArm", "runs", "semanticMismatches", "concurrent", "sequential"]) {
+      if (!(key in value)) throw new Error(`${displayPath}: missing required semantic-stability field ${key}`)
+    }
+    if (!Array.isArray(value.semanticMismatches) || value.semanticMismatches.length !== 0
+      || !Array.isArray(value.stalePlanMismatches) || value.stalePlanMismatches.length !== 0
+      || value.stalePlan?.expected?.concurrent?.fresh !== false
+      || value.stalePlan?.expected?.sequential?.fresh !== true) {
+      throw new Error(`${displayPath}: semantic-stability evidence contains mismatches`)
+    }
+    return
+  }
+  if (value?.schema === "incidentmesh.report/v1") return
   if (value?.schema !== "incidentmesh.provider-evidence/v1") {
     throw new Error(`${displayPath}: unexpected or missing evidence schema`)
   }
-  for (const key of ["commit", "provider", "model", "startedAt", "completedAt", "participants", "events", "overlap", "gateDecision", "interceptionObserved", "action", "limitations"]) {
+  for (const key of ["commit", "provider", "model", "startedAt", "completedAt", "participants", "events", "overlap", "gateDecision", "interceptionObserved", "action", "hypotheses", "inferenceEvents", "limitations"]) {
     if (!(key in value)) throw new Error(`${displayPath}: missing required field ${key}`)
   }
-  if (!Array.isArray(value.participants) || !Array.isArray(value.events) || !Array.isArray(value.limitations)) {
-    throw new Error(`${displayPath}: participants, events, and limitations must be arrays`)
+  if (!Array.isArray(value.participants) || !Array.isArray(value.events) || !Array.isArray(value.hypotheses)
+    || !Array.isArray(value.inferenceEvents) || !Array.isArray(value.limitations)) {
+    throw new Error(`${displayPath}: participants, events, hypotheses, inferenceEvents, and limitations must be arrays`)
+  }
+
+  for (const role of responderNames.keys()) {
+    const hypotheses = value.hypotheses.filter((item) => item?.role === role)
+    if (hypotheses.length !== 1) throw new Error(`${displayPath}: expected exactly one accepted ${role} hypothesis`)
+    const hypothesis = hypotheses[0]
+    if (typeof hypothesis.claim !== "string" || hypothesis.claim.trim().length === 0
+      || typeof hypothesis.rootCause !== "string" || hypothesis.rootCause.trim().length === 0
+      || typeof hypothesis.confidence !== "number" || !Number.isFinite(hypothesis.confidence)
+      || hypothesis.confidence < 0 || hypothesis.confidence > 1) {
+      throw new Error(`${displayPath}: invalid accepted ${role} hypothesis`)
+    }
+  }
+
+  const timelineInferenceEvents = value.events.filter((item) =>
+    item?.type === "mozaik.inference.started" || item?.type === "mozaik.inference.completed")
+  if (JSON.stringify(timelineInferenceEvents) !== JSON.stringify(value.inferenceEvents)) {
+    throw new Error(`${displayPath}: inferenceEvents must exactly match inference lifecycle events in the primary timeline`)
+  }
+
+  const intervals = []
+  for (const [role, producer] of responderNames) {
+    const starts = timelineInferenceEvents.filter((item) => item?.type === "mozaik.inference.started" && item?.producer === producer)
+    const completions = timelineInferenceEvents.filter((item) => item?.type === "mozaik.inference.completed" && item?.producer === producer)
+    if (starts.length !== 1 || completions.length !== 1) {
+      throw new Error(`${displayPath}: expected exactly one inference start/completion pair for ${role}`)
+    }
+    const startedAtMs = starts[0].atMs
+    const completedAtMs = completions[0].atMs
+    assertFiniteTime(startedAtMs, `${role} inference start`, displayPath)
+    assertFiniteTime(completedAtMs, `${role} inference completion`, displayPath)
+    if (completedAtMs <= startedAtMs) throw new Error(`${displayPath}: ${role} inference completion must follow its start`)
+    intervals.push({ role, startedAtMs, completedAtMs })
+  }
+
+  const commonStartMs = Math.max(...intervals.map((item) => item.startedAtMs))
+  const commonEndMs = Math.min(...intervals.map((item) => item.completedAtMs))
+  if (commonEndMs <= commonStartMs) {
+    throw new Error(`${displayPath}: responder inference windows do not have positive three-way overlap`)
+  }
+
+  if (value.events.some((item) => item?.type === "incident.scenario.timeout")) {
+    throw new Error(`${displayPath}: provider evidence contains an internal scenario timeout`)
+  }
+  if (value.phase1Only === false) {
+    const recommendation = value.action?.modelRecommendation
+    const requiredEvents = [
+      "incident.mitigation.phase-started",
+      "mozaik.interception.started",
+      "mozaik.interception.rewritten",
+      "incident.action.safe-executed",
+      "incident.mitigation.replanned",
+    ]
+    if (value.gateDecision !== "blocked"
+      || value.interceptionObserved !== true
+      || value.action?.requestedTool !== "rollback_production"
+      || value.action?.executedTool !== "request_corroboration"
+      || typeof recommendation !== "string"
+      || recommendation.trim().length === 0) {
+      throw new Error(`${displayPath}: incomplete authenticated Phase-2 proof`)
+    }
+    for (const type of requiredEvents) {
+      if (!value.events.some((item) => item?.type === type)) {
+        throw new Error(`${displayPath}: missing required Phase-2 event ${type}`)
+      }
+    }
   }
 }
 
@@ -61,7 +218,8 @@ for (const input of files) {
     console.error(`${displayPath}: rejected: ${matches.map(({ name }) => name).join(", ")}`)
     failures += 1
   } else {
-    console.log(`${displayPath}: evidence structure and secret-pattern scan passed`)
+    const proof = file.endsWith(".json") ? "structure, invariant proof, and " : ""
+    console.log(`${displayPath}: evidence ${proof}secret-pattern scan passed`)
   }
 }
 
