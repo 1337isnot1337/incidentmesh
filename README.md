@@ -8,7 +8,7 @@
   <a href="#causal-concurrency-ablation"><strong>Causal proof</strong></a>
 </p>
 
-<p align="center">Same evidence, same safety policy, same action boundary. Concurrency determines whether the system has enough information to choose a safe action in time.</p>
+<p align="center">Same evidence, same safety policy, same configured action-boundary timer. Concurrency determines which action crosses the safety boundary when that timer fires.</p>
 
 ## Demo
 
@@ -20,12 +20,12 @@ npm run demo
 The canonical report can be rendered as an auditable replay with `npm run replay:visual`:
 
 <p align="center">
-  <img src="docs/evidence/replay.svg" alt="IncidentMesh canonical replay showing overlapping responder spans, the fixed action boundary, a blocked Safety Gate, Mozaik interception, and the safe rewrite" />
+  <img src="docs/evidence/replay.svg" alt="IncidentMesh canonical replay showing overlapping responder spans, the configured action-boundary timer, a blocked Safety Gate, Mozaik interception, and the safe rewrite" />
 </p>
 
-The exact millisecond values vary slightly by machine. The responder overlap, three hypotheses, two contradictions, blocked gate, adaptive canary, and two follow-up evidence responses are deterministic.
+The exact millisecond values vary by machine and scheduler load. The responder overlap, three hypotheses, two contradictions, blocked gate, adaptive canary, and two follow-up evidence responses are deterministic.
 
-The deterministic demo traverses the actual Mozaik function-call loop. At the fixed action boundary, the gate evaluates the evidence already in shared state and becomes blocked; Mozaik then emits `interception.started`, `SafetyGateInterception` rewrites the call to `request_corroboration`, Mozaik emits `interception.finished`, and the registered safe tool executes before Impact replans to a canary. This is framework execution, not a printed simulation of interception.
+The deterministic demo traverses the actual Mozaik function-call loop. At the configured action-boundary timer, the gate evaluates the evidence already in shared state and becomes blocked; Mozaik then emits `interception.started`, `SafetyGateInterception` rewrites the call to `request_corroboration`, Mozaik emits `interception.finished`, and the registered safe tool executes before Impact replans to a canary. This is framework execution, not a printed simulation of interception.
 
 See [`docs/demo.md`](docs/demo.md) for the 90-second judge narration.
 
@@ -47,9 +47,9 @@ The important claims are directly inspectable:
 
 `npm run ablation` asks the stronger question: **does concurrent evidence change the action outcome, not merely the runtime?**
 
-The experiment holds constant the incident, all three evidence items, their confidence values, the gate rule, the proposed `rollback_production` action, and a fixed 205 ms action boundary. It changes only when responder evidence becomes available.
+The experiment holds constant the incident, all three evidence items, their confidence values, the gate rule, the proposed `rollback_production` action, and the same configured 205 ms action-boundary timer. It changes only when responder evidence becomes available.
 
-| At the same 205 ms boundary | Concurrent evidence | Sequential evidence |
+| At the same configured 205 ms boundary | Concurrent evidence | Sequential evidence |
 | --- | --- | --- |
 | Hypotheses available | 3 | 1 |
 | Contradictions available | 2 | 0 |
@@ -59,7 +59,9 @@ The experiment holds constant the incident, all three evidence items, their conf
 | Final evidence after all responders finish | same 3 hypotheses / 2 contradictions | same 3 hypotheses / 2 contradictions |
 | Final gate state | `BLOCKED` | `BLOCKED`, but after the action boundary |
 
-The sequential case is not a different policy or weaker evidence set. Its later responders run the same deterministic work with the same confidence values; their contradictory evidence simply arrives after the action boundary. The rollback tool is proposal-only, so this demonstrates a control-flow escape across the safety boundary, not an actual production rollback.
+The sequential case is not a different policy or weaker evidence set. Its later responders run the same deterministic work with the same confidence values; their contradictory evidence simply arrives after the action-boundary timer. The rollback tool is proposal-only, so this demonstrates a control-flow escape across the safety boundary, not an actual production rollback.
+
+The 205 ms value is a fixture configuration, not a hard real-time guarantee. JavaScript timers can fire late under host scheduler load; `action.attemptedAtMs` reports the observed callback time. The causal separation comes from the wider interval between contradictory evidence becoming available in the concurrent schedule and the same evidence becoming available in the sequential schedule, rather than from one exact timer tick.
 
 This is the project's main causal claim: **parallel evidence is available soon enough to change which function call Mozaik executes.**
 
@@ -97,11 +99,11 @@ npm run demo
 Other useful commands:
 
 ```bash
-npm run ablation    # same evidence/policy/deadline; scheduling changes the action outcome
+npm run ablation    # same evidence/policy/timer; scheduling changes the action outcome
 npm run benchmark   # supporting measured overlap/latency proxy
 npm run replay      # JSON event/report replay
 npm run replay:visual # generated SVG + JSON canonical replay
-npm run degradation  # Dependency timeout remains fail-closed
+npm run degradation  # explicit Dependency timeout remains fail-closed
 npm run provider:evidence:check # inspect provider/model + credential availability; does not execute
 npm run verify      # typecheck + tests + production build + built smoke check
 npm run demo:built  # run the committed production build
@@ -142,7 +144,7 @@ The implementation uses Mozaik 4.0.5 directly:
 
 ### Safety Gate and action phase
 
-The gate aggregates confidence and counts disagreement as the number of distinct root-cause hypotheses minus one. In the canonical deterministic fixture there are three distinct root-cause hypotheses, so `contradictions === 2`. At the fixed action boundary, the gate evaluates whatever evidence is already available; that timing is what makes the causal ablation meaningful.
+The gate aggregates confidence and counts disagreement as the number of distinct root-cause hypotheses minus one. In the canonical deterministic fixture there are three distinct root-cause hypotheses, so `contradictions === 2`. At the configured action-boundary timer, the gate evaluates whatever evidence is already available when the callback runs; that timing is what makes the causal ablation meaningful. The report keeps both the configured `boundaryMs` and observed `attemptedAtMs` so timer delay is visible.
 
 `SafetyGateInterception` targets only `rollback_production`. In the canonical zero-key demo, the pending rollback reaches Mozaik's function-call transition after the gate blocks, is rewritten to the registered proposal-only `request_corroboration` tool, and the safe tool executes through the normal function-call state. Impact's subsequent canary replan is deterministic application logic, not an LLM reconsideration. IncidentMesh never performs a real production rollback.
 
@@ -186,7 +188,7 @@ External telemetry adapters, paging integrations, and automatic production actio
 
 `npm run degradation` simulates one realistic failure: the Dependency responder starts, times out before publishing a hypothesis, and records that missing evidence in shared state. Trace and Impact continue. Because the missing Dependency signal is known, the Safety Gate fails closed at the action boundary, Mozaik still rewrites `rollback_production` to `request_corroboration`, Impact replans to a canary, and Trace supplies the surviving corroboration.
 
-This is intentionally narrow. IncidentMesh does not claim generic fault tolerance or dynamic-agent recovery.
+This is intentionally narrow. The fail-closed claim applies when degradation is explicit shared state before the action-boundary evaluation. Evidence that has merely not arrived yet is evaluated under the normal available-evidence policy; the causal ablation intentionally exercises that different case. IncidentMesh does not claim generic missing-evidence safety, generic fault tolerance, or dynamic-agent recovery.
 
 ## Development
 
@@ -197,7 +199,7 @@ npm run build
 npm run verify:built
 ```
 
-The twelve focused tests cover responder overlap, active peer observations, shared-state gating, adaptive follow-up, end-to-end interception, executable safe rewriting, event-driven completion, structured model hypotheses, stable timeout snapshots, and the fixed-boundary causal ablation across combined assertions.
+The twelve focused tests cover responder overlap, active peer observations, shared-state gating, adaptive follow-up, end-to-end interception, executable safe rewriting, event-driven completion, structured model hypotheses, stable timeout snapshots, and the configured-boundary causal ablation across combined assertions.
 
 `dist/` is intentionally committed. Judges can inspect or run the built JavaScript without trusting an unpublished package, while `src/` remains the source of truth.
 
