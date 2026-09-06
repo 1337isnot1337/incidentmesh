@@ -4,6 +4,10 @@
 
 IncidentMesh
 
+## Repository URL
+
+https://github.com/1337isnot1337/incidentmesh
+
 ## What does it do?
 
 IncidentMesh is a live incident-response room for a checkout outage. Trace, Dependency, and Impact are independent concurrent Mozaik participants with different capabilities. They investigate at the same time, publish hypotheses into shared typed runtime state, and observe one another. Safety Gate aggregates contradiction and confidence signals, blocks an unsafe rollback when the evidence is weak, and causes the room to replan to a canary with corroboration.
