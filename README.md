@@ -102,7 +102,7 @@ OPENAI_API_KEY=... RUN_MODEL=1 npm run dev
 
 Phase-1 peer observations happen in runtime handlers; peer hypotheses are not injected into those models. The Phase-2 controller receives the aggregate evidence. Its rollback calls pass through the same interception handler, and a rewritten tool result returns to the model loop.
 
-A scripted `InferenceRunner` integration test exercises this lifecycle through Mozaik's real loop. **No authenticated provider execution is claimed or committed.**
+A scripted `InferenceRunner` integration test exercises this lifecycle through Mozaik's real loop. A separate [authenticated Gemini Phase-1 receipt](docs/evidence/real-provider-run.md) records one bounded run of all three responder model loops; the full provider-backed Phase-2 tool-call path remains a separate limitation.
 
 [Provider setup, failure behavior, and evidence capture](docs/implementation.md#deterministic-and-provider-backed-modes)
 
