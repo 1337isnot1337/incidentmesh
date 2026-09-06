@@ -1,6 +1,8 @@
-# Final submission copy
+# Published JigJoy submission copy
 
-The first five sections are paste-ready JigJoy fields. They intentionally use plain text because the gallery renders these fields as plain text.
+The first five sections below are the exact field values currently published on JigJoy under `incidentmesh-40ad9c`. They intentionally remain frozen so repository documentation cannot silently diverge from the public entry. The gallery renders these fields as plain text.
+
+The public text predates the later release-SHA Phase-1 Gemini capture. Its historical 1,389 ms provider claim remains true; the newer 1,363 ms release-runtime evidence is documented separately in the repository and is not retroactively inserted into these published fields.
 
 ## Project name
 
@@ -36,14 +38,14 @@ https://www.youtube.com/watch?v=ohw8Ybt_dIM
 
 ## Screenshots
 
-Use the four current gallery images, in this order:
+The published entry uses these four repository images, in this order:
 
 1. `docs/gallery/jigjoy-01-cover.png`
 2. `docs/gallery/jigjoy-02-ablation.png`
 3. `docs/gallery/jigjoy-03-interception.png`
 4. `docs/gallery/jigjoy-04-safety-proof.png`
 
-They cover the action boundary, stale-plan causal ablation, canonical interception receipt, and degradation/fail-closed behavior without relying on screenshots of prose or terminal output.
+They cover the action boundary, stale-plan causal ablation, canonical interception receipt, and degradation/fail-closed behavior without relying on screenshots of prose or terminal output. The latest public-surface audit confirms the CDN bytes match these files exactly.
 
 ## Final tagline
 
@@ -62,26 +64,33 @@ npm run stress:safety
 
 Then see [`../judge-guide.md`](../judge-guide.md) for the five-minute walkthrough or [`../demo.md`](../demo.md) for the video-first verification path.
 
-Core evidence:
+Current core evidence:
 
-1. [`../evidence/real-provider-run.md`](../evidence/real-provider-run.md) — historical authenticated Gemini Flash-Lite run: 1,389 ms common three-way provider-call overlap, Phase-2 rollback proposal, real Mozaik interception, safe tool, provider follow-up.
-2. [`../evidence/stale-plan-ablation.md`](../evidence/stale-plan-ablation.md) — same revision-1 plan; concurrent peer progress advances the boundary to revision 3 and invalidates it; serialization leaves it fresh.
-3. [`../evidence/safety-stress.md`](../evidence/safety-stress.md) — 10,000 seeded cases / 40,000 attempts / zero unauthorized rollback, bounded, or stale non-safe crossings.
-4. [`judge-proof-map.md`](judge-proof-map.md) — claim-by-claim artifact and limitation map.
+1. [`../evidence/release-phase1-provider-run.md`](../evidence/release-phase1-provider-run.md) + [raw JSON](../evidence/release-phase1-provider-run.json) — fresh authenticated Google Gemini Flash-Lite run against frozen runtime `e98376445c42ea532cbe4993095911d932a3a57a`: **1,363 ms** common three-way responder provider-call overlap, 3/3 accepted hypotheses, blocked gate. This run did not propose `rollback_production`, so it is scoped to Phase 1.
+2. [`../evidence/real-provider-run.md`](../evidence/real-provider-run.md) — historical authenticated Gemini Flash-Lite full-path run: **1,389 ms** common three-way provider-call overlap, Phase-2 rollback proposal, real Mozaik interception, safe tool, provider follow-up.
+3. [`../evidence/stale-plan-ablation.md`](../evidence/stale-plan-ablation.md) — same revision-1 plan; concurrent peer progress advances the boundary to revision 3 and invalidates it; serialization leaves it fresh.
+4. [`../evidence/safety-stress.md`](../evidence/safety-stress.md) — 10,000 seeded cases / 40,000 attempts / zero unauthorized rollback, bounded, or stale non-safe crossings.
+5. [`judge-proof-map.md`](judge-proof-map.md) — claim-by-claim artifact and limitation map.
 
 ## Scope
 
-The authenticated receipt is one historical bounded execution captured on its recorded commit; it is not rewritten as final-SHA evidence. The stale-plan counterfactual is a deterministic final-runtime replay of frozen provider hypotheses, not a live provider scheduling experiment. `targeted_canary_probe` and `rollback_production` are proposal-only fixtures. No production mutation, production-readiness, MTTR, generic speedup, simultaneous-token-generation, or dynamic in-flight prompt-editing claim is made.
+The repository has two distinct authenticated provider artifacts:
 
-## Final resubmission checklist
+- the fresh release-SHA capture proves authenticated Phase-1 provider-call overlap on `e983764...` but does not prove fresh authenticated Phase-2 interception;
+- the historical full receipt proves provider-backed rollback proposal/interception/safe-tool/follow-up on its own recorded commit.
 
-Before submitting the final revision, verify all of the following in the JigJoy form:
+The stale-plan counterfactual is a deterministic final-runtime replay of frozen provider hypotheses, not a live provider scheduling experiment. `targeted_canary_probe` and `rollback_production` are proposal-only fixtures. No production mutation, production-readiness, MTTR, generic speedup, simultaneous-token-generation, or dynamic in-flight prompt-editing claim is made.
 
-- Project name is `IncidentMesh`.
-- Repository URL is `https://github.com/1337isnot1337/incidentmesh`.
-- Description is the paste-ready description above, not the older dense gallery copy.
-- Concurrency explanation is the paste-ready explanation above.
-- Demo/video URL is `https://www.youtube.com/watch?v=ohw8Ybt_dIM`.
-- All four current gallery screenshots are attached in the order above.
-- No field claims a production integration, MTTR improvement, generic speedup, live final-SHA provider run, or serialized destructive rollback crossing.
-- After submitting, open the public entry logged out and verify the repository link, video link, four screenshots, description, and concurrency explanation.
+## Published submission state
+
+Latest logged-out verification on 2026-09-06 confirms:
+
+- slug: `incidentmesh-40ad9c`;
+- published record timestamp: `2026-09-06T21:52:39.718Z`;
+- repository field: `https://github.com/1337isnot1337/incidentmesh`;
+- Description and Concurrency fields exactly match the frozen sections above;
+- Demo/video URL: `https://www.youtube.com/watch?v=ohw8Ybt_dIM`;
+- deployment field: empty;
+- all four screenshots are present in the order above and match repository bytes.
+
+No resubmission is required merely to expose newer repository evidence. If the public JigJoy fields are intentionally changed later, update this frozen copy only after verifying the new logged-out public record.
