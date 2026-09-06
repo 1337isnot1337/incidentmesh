@@ -38,12 +38,38 @@ function assertEvidenceShape(file, displayPath, text) {
   if (!file.endsWith(".json")) return
   const value = JSON.parse(text)
   if (value?.schema === "incidentmesh.safety-stress/v1") {
-    for (const key of ["seed", "cases", "approvedSnapshots", "blockedSnapshots", "approvedCrossings", "blockedRewrites", "unauthorizedRollbackCrossings", "snapshotMutationViolations", "invariantViolations"]) {
+    for (const key of ["seed", "cases", "approvedSnapshots", "blockedSnapshots", "approvedCrossings", "blockedRewrites", "unauthorizedRollbackCrossings", "staleNonSafeCrossings", "unauthorizedBoundedCrossings", "actionPolicyInvariantViolations", "attemptIsolationViolations", "snapshotMutationViolations", "invariantViolations"]) {
       if (!(key in value)) throw new Error(`${displayPath}: missing required safety-stress field ${key}`)
     }
     if (!Array.isArray(value.invariantViolations)) throw new Error(`${displayPath}: invariantViolations must be an array`)
-    if (value.unauthorizedRollbackCrossings !== 0 || value.snapshotMutationViolations !== 0 || value.invariantViolations.length !== 0) {
+    if (value.unauthorizedRollbackCrossings !== 0 || value.staleNonSafeCrossings !== 0
+      || value.unauthorizedBoundedCrossings !== 0 || value.actionPolicyInvariantViolations !== 0
+      || value.attemptIsolationViolations !== 0 || value.snapshotMutationViolations !== 0
+      || value.invariantViolations.length !== 0) {
       throw new Error(`${displayPath}: safety-stress evidence contains invariant violations`)
+    }
+    return
+  }
+  if (value?.schema === "incidentmesh.stale-plan-ablation/v1") {
+    for (const key of ["source", "fixedInputs", "changedVariable", "concurrent", "sequential", "invariants", "causalFinding", "limitation"]) {
+      if (!(key in value)) throw new Error(`${displayPath}: missing required stale-plan field ${key}`)
+    }
+    const invariants = value.invariants
+    if (invariants?.sameEventualEvidence !== true || invariants?.sameFirstPlanningRevision !== true
+      || invariants?.sameCandidateAction !== true || invariants?.concurrentProposalInvalidatedAsStale !== true
+      || invariants?.concurrentFreshReplanSeesConflict !== true
+      || invariants?.sequentialProposalCrossedWhileFresh !== true
+      || invariants?.unauthorizedRollbackCrossings !== 0 || invariants?.staleNonSafeCrossings !== 0) {
+      throw new Error(`${displayPath}: stale-plan causal invariants failed`)
+    }
+    if (value.changedVariable !== "peer-evidence scheduling relative to the same in-flight plan"
+      || value.concurrent?.firstPlanningRevision !== value.sequential?.firstPlanningRevision
+      || value.concurrent?.candidateAction !== value.sequential?.candidateAction
+      || value.concurrent?.proposalFresh !== false || value.concurrent?.boundedActionCrossed !== false
+      || value.concurrent?.mozaikInterceptionObserved !== true || value.concurrent?.proposalRewritten !== true
+      || value.concurrent?.safeToolExecuted !== true
+      || value.sequential?.proposalFresh !== true || value.sequential?.boundedActionCrossed !== true) {
+      throw new Error(`${displayPath}: stale-plan arms do not match the controlled theorem`)
     }
     return
   }
@@ -60,7 +86,10 @@ function assertEvidenceShape(file, displayPath, text) {
     for (const key of ["repetitionsPerArm", "runs", "semanticMismatches", "concurrent", "sequential"]) {
       if (!(key in value)) throw new Error(`${displayPath}: missing required semantic-stability field ${key}`)
     }
-    if (!Array.isArray(value.semanticMismatches) || value.semanticMismatches.length !== 0) {
+    if (!Array.isArray(value.semanticMismatches) || value.semanticMismatches.length !== 0
+      || !Array.isArray(value.stalePlanMismatches) || value.stalePlanMismatches.length !== 0
+      || value.stalePlan?.expected?.concurrent?.fresh !== false
+      || value.stalePlan?.expected?.sequential?.fresh !== true) {
       throw new Error(`${displayPath}: semantic-stability evidence contains mismatches`)
     }
     return

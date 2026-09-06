@@ -34,6 +34,7 @@
     "verify": "npm run check && npm run build && npm run verify:built",
     "ablation": "tsx src/ablation.ts",
     "ablation:provider-derived": "tsx src/provider-derived-ablation.ts",
+    "ablation:stale-plan": "tsx src/stale-plan-ablation.ts",
     "replay:visual": "tsx src/replay-visual.ts",
     "degradation": "tsx src/degradation.ts",
     "stress:safety": "tsx src/stress-safety.ts",
