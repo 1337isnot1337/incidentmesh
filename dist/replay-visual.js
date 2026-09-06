@@ -1,9 +1,82 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+import assert from "node:assert/strict";
 import { runIncidentScenario } from "./app.js";
 const outputSvg = resolve(process.argv[2] ?? "docs/evidence/replay.svg");
 const outputJson = resolve(process.argv[3] ?? "docs/evidence/replay.json");
-const report = await runIncidentScenario({ dryRun: true, scheduleMode: "concurrent", actionBoundaryMs: 205 });
+const liveReport = await runIncidentScenario({ dryRun: true, scheduleMode: "concurrent", actionBoundaryMs: 205 });
+assert.equal(liveReport.gateDecision, "blocked");
+assert.equal(liveReport.gateReason, "conflicting-evidence");
+assert.equal(liveReport.hypotheses.length, 3);
+assert.equal(liveReport.contradictions, 2);
+assert.equal(liveReport.action.gateAtBoundary, "blocked");
+assert.equal(liveReport.action.gateReasonAtBoundary, "conflicting-evidence");
+assert.equal(liveReport.action.intercepted, true);
+assert.equal(liveReport.action.executedTool, "request_corroboration");
+assert.equal(liveReport.evidence.length, 2);
+const canonicalTime = (item) => {
+    if (item.type === "incident.opened" || item.type === "incident.span.started")
+        return 0;
+    if (item.type === "incident.action.proposed")
+        return 45;
+    if (item.type === "incident.hypothesis.emitted" && item.producer === "Trace")
+        return 80;
+    if (item.type === "incident.hypothesis.emitted" && item.producer === "Dependency")
+        return 130;
+    if (item.type === "incident.hypothesis.emitted" && item.producer === "Impact")
+        return 180;
+    if (item.type === "awareness.peer-observed" && item.detail.includes("trace hypothesis"))
+        return 80;
+    if (item.type === "awareness.peer-observed" && item.detail.includes("dependency hypothesis"))
+        return 130;
+    if (item.type === "awareness.peer-observed" && item.detail.includes("impact hypothesis"))
+        return 180;
+    if (item.type === "incident.span.completed" && item.producer === "Trace")
+        return 118;
+    if (item.type === "incident.span.completed" && item.producer === "Dependency")
+        return 168;
+    if (item.type === "incident.span.completed" && item.producer === "Impact")
+        return 218;
+    if (item.type === "incident.gate.decision" && item.detail.includes("evidence-aggregation"))
+        return 180;
+    if (item.type === "incident.action.execution-requested" || (item.type === "incident.gate.decision" && item.detail.includes("boundary hypotheses")))
+        return 205;
+    if (item.type.startsWith("mozaik.interception.") || item.type.startsWith("mozaik.function-call.") || item.type === "incident.action.safe-executed")
+        return 205;
+    if (item.type === "incident.mitigation.replanned")
+        return 240;
+    if (item.type === "incident.evidence.added" && item.producer === "Trace")
+        return 264;
+    if (item.type === "incident.evidence.added" && item.producer === "Dependency")
+        return 282;
+    throw new Error(`no canonical replay timestamp for ${item.type} / ${item.producer} / ${item.detail}`);
+};
+const report = {
+    ...liveReport,
+    hypotheses: liveReport.hypotheses.map((item) => ({
+        ...item,
+        atMs: item.role === "trace" ? 80 : item.role === "dependency" ? 130 : 180,
+    })),
+    action: {
+        ...liveReport.action,
+        attemptedAtMs: 205,
+        actionableSafePlanAtMs: 205,
+        boundarySnapshot: liveReport.action.boundarySnapshot === null ? null : {
+            ...liveReport.action.boundarySnapshot,
+            atMs: 205,
+            availableRoles: [...liveReport.action.boundarySnapshot.availableRoles],
+            missingRequiredRoles: [...liveReport.action.boundarySnapshot.missingRequiredRoles],
+            degradedRoles: [...liveReport.action.boundarySnapshot.degradedRoles],
+        },
+    },
+    spans: liveReport.spans.map((span) => ({
+        ...span,
+        startedAtMs: 0,
+        completedAtMs: span.role === "trace" ? 118 : span.role === "dependency" ? 168 : 218,
+    })),
+    timeline: liveReport.timeline.map((item) => ({ ...item, atMs: canonicalTime(item) })),
+    elapsedMs: 282,
+};
 const esc = (value) => value
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
