@@ -40,6 +40,6 @@
       <path d="M390 429 V437 M386 433 L390 437 L394 433"/>
       <path d="M390 475 V483 M386 479 L390 483 L394 479"/>
     </g>
-    <text x="24" y="544" fill="#708794" font-size="12">receipt 65d98f8 · no production mutation · historical provider evidence</text>
+    <text x="24" y="544" fill="#708794" font-size="12">receipt 65d98f8 · historical · no production mutation</text>
   </g>
 </svg>
