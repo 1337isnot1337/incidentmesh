@@ -46,13 +46,13 @@
     <g font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="16">
       <text x="40" y="334" fill="#b0c1cc">rollback_production</text>
       <text x="270" y="334" fill="#ffb18a">SafetyGateInterception</text>
-      <text x="548" y="334" fill="#8ee3c7">request_corroboration</text>
-      <text x="798" y="334" fill="#b0c1cc">provider follow-up</text>
+      <text x="540" y="334" fill="#8ee3c7">request_corroboration</text>
+      <text x="784" y="334" fill="#b0c1cc">provider follow-up</text>
     </g>
     <g fill="none" stroke="#708794" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M215 328 H252 M246 322 L252 328 L246 334"/>
       <path d="M501 328 H530 M524 322 L530 328 L524 334"/>
-      <path d="M752 328 H780 M774 322 L780 328 L774 334"/>
+      <path d="M750 328 H770 M764 322 L770 328 L764 334"/>
     </g>
 
     <text x="40" y="374" fill="#708794" font-size="15">Authenticated receipt source commit 65d98f8 · no production mutation · not a final-SHA provider run</text>
