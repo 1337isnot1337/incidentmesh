@@ -1,0 +1,287 @@
+{
+  "schema": "incidentmesh.provider-evidence/v1",
+  "phase1Only": true,
+  "commit": "d2f50acb08c476e56f8975ebda11219b8fe3ce47",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "startedAt": "2026-09-06T05:22:18.110Z",
+  "completedAt": "2026-09-06T05:22:48.358Z",
+  "participants": [
+    {
+      "role": "trace",
+      "startedAtMs": 2,
+      "completedAtMs": 2419
+    },
+    {
+      "role": "dependency",
+      "startedAtMs": 3,
+      "completedAtMs": 2881
+    },
+    {
+      "role": "impact",
+      "startedAtMs": 3,
+      "completedAtMs": 2602
+    }
+  ],
+  "events": [
+    {
+      "atMs": 1,
+      "type": "incident.opened",
+      "producer": "Incident Commander",
+      "detail": "incident.opened"
+    },
+    {
+      "atMs": 2,
+      "type": "incident.span.started",
+      "producer": "Trace",
+      "detail": "trace started model investigation"
+    },
+    {
+      "atMs": 3,
+      "type": "incident.span.started",
+      "producer": "Dependency",
+      "detail": "dependency started model investigation"
+    },
+    {
+      "atMs": 3,
+      "type": "incident.span.started",
+      "producer": "Impact",
+      "detail": "impact started model investigation"
+    },
+    {
+      "atMs": 4,
+      "type": "mozaik.inference.started",
+      "producer": "Trace",
+      "detail": "inference.started gemini-3.5-flash"
+    },
+    {
+      "atMs": 5,
+      "type": "mozaik.inference.started",
+      "producer": "Dependency",
+      "detail": "inference.started gemini-3.5-flash"
+    },
+    {
+      "atMs": 5,
+      "type": "mozaik.inference.started",
+      "producer": "Impact",
+      "detail": "inference.started gemini-3.5-flash"
+    },
+    {
+      "atMs": 2418,
+      "type": "mozaik.inference.completed",
+      "producer": "Trace",
+      "detail": "inference.completed provider model"
+    },
+    {
+      "atMs": 2418,
+      "type": "incident.hypothesis.emitted",
+      "producer": "Trace",
+      "detail": "Trace analysis of checkout-api-us-east indicates a critical latency spike and high error rates tracing back to upstream connection pool exhaustion in the payment-processor downstream dependency."
+    },
+    {
+      "atMs": 2419,
+      "type": "awareness.peer-observed",
+      "producer": "Dependency",
+      "detail": "Dependency observed trace hypothesis"
+    },
+    {
+      "atMs": 2419,
+      "type": "awareness.peer-observed",
+      "producer": "Impact",
+      "detail": "Impact observed trace hypothesis"
+    },
+    {
+      "atMs": 2419,
+      "type": "incident.span.completed",
+      "producer": "Trace",
+      "detail": "model response complete"
+    },
+    {
+      "atMs": 2602,
+      "type": "mozaik.inference.completed",
+      "producer": "Impact",
+      "detail": "inference.completed provider model"
+    },
+    {
+      "atMs": 2602,
+      "type": "incident.hypothesis.emitted",
+      "producer": "Impact",
+      "detail": "Spike in response times on checkout-api-us-east is causing a 12% drop in successful checkouts, primarily impacting users attempting credit card transactions in the US-East region."
+    },
+    {
+      "atMs": 2602,
+      "type": "awareness.peer-observed",
+      "producer": "Trace",
+      "detail": "Trace observed impact hypothesis"
+    },
+    {
+      "atMs": 2602,
+      "type": "awareness.peer-observed",
+      "producer": "Dependency",
+      "detail": "Dependency observed impact hypothesis"
+    },
+    {
+      "atMs": 2602,
+      "type": "incident.span.completed",
+      "producer": "Impact",
+      "detail": "model response complete"
+    },
+    {
+      "atMs": 2881,
+      "type": "mozaik.inference.completed",
+      "producer": "Dependency",
+      "detail": "inference.completed provider model"
+    },
+    {
+      "atMs": 2881,
+      "type": "incident.hypothesis.emitted",
+      "producer": "Dependency",
+      "detail": "A recent deployment of checkout-api-us-east introduced an incompatible library dependency, leading to cascading failures in the checkout pipeline."
+    },
+    {
+      "atMs": 2881,
+      "type": "incident.gate.decision",
+      "producer": "Safety Gate",
+      "detail": "blocked: conflicting-evidence; 2 contradictions across 3 hypotheses; confidence 0.83 (evidence-aggregation)"
+    },
+    {
+      "atMs": 2881,
+      "type": "awareness.peer-observed",
+      "producer": "Trace",
+      "detail": "Trace observed dependency hypothesis"
+    },
+    {
+      "atMs": 2881,
+      "type": "awareness.peer-observed",
+      "producer": "Impact",
+      "detail": "Impact observed dependency hypothesis"
+    },
+    {
+      "atMs": 2881,
+      "type": "incident.span.completed",
+      "producer": "Dependency",
+      "detail": "model response complete"
+    },
+    {
+      "atMs": 30009,
+      "type": "incident.scenario.timeout",
+      "producer": "Incident Console",
+      "detail": "scenario did not settle within 30000ms"
+    }
+  ],
+  "overlap": {
+    "pairCount": 3,
+    "pairs": [
+      {
+        "roles": [
+          "trace",
+          "dependency"
+        ],
+        "overlapMs": 2416
+      },
+      {
+        "roles": [
+          "trace",
+          "impact"
+        ],
+        "overlapMs": 2416
+      },
+      {
+        "roles": [
+          "dependency",
+          "impact"
+        ],
+        "overlapMs": 2599
+      }
+    ]
+  },
+  "gateDecision": "blocked",
+  "interceptionObserved": false,
+  "action": {
+    "proposed": false,
+    "requestedTool": null,
+    "boundaryMs": 205,
+    "attemptedAtMs": null,
+    "gateAtBoundary": null,
+    "gateReasonAtBoundary": null,
+    "hypothesesAtBoundary": 0,
+    "contradictionsAtBoundary": 0,
+    "boundarySnapshot": null,
+    "boundarySafeAction": null,
+    "actionableSafePlan": null,
+    "actionableSafePlanAtMs": null,
+    "intercepted": false,
+    "executedTool": null,
+    "mitigationPhaseStarted": false,
+    "modelRecommendation": null
+  },
+  "hypotheses": [
+    {
+      "role": "trace",
+      "claim": "Trace analysis of checkout-api-us-east indicates a critical latency spike and high error rates tracing back to upstream connection pool exhaustion in the payment-processor downstream dependency.",
+      "confidence": 0.85,
+      "rootCause": "downstream_dependency_exhaustion",
+      "atMs": 2419
+    },
+    {
+      "role": "impact",
+      "claim": "Spike in response times on checkout-api-us-east is causing a 12% drop in successful checkouts, primarily impacting users attempting credit card transactions in the US-East region.",
+      "confidence": 0.85,
+      "rootCause": "dependency_latency_spike",
+      "atMs": 2602
+    },
+    {
+      "role": "dependency",
+      "claim": "A recent deployment of checkout-api-us-east introduced an incompatible library dependency, leading to cascading failures in the checkout pipeline.",
+      "confidence": 0.8,
+      "rootCause": "broken_dependency_upgrade",
+      "atMs": 2881
+    }
+  ],
+  "adaptations": [],
+  "evidence": [],
+  "reportElapsedMs": 30009,
+  "inferenceEvents": [
+    {
+      "atMs": 4,
+      "type": "mozaik.inference.started",
+      "producer": "Trace",
+      "detail": "inference.started gemini-3.5-flash"
+    },
+    {
+      "atMs": 5,
+      "type": "mozaik.inference.started",
+      "producer": "Dependency",
+      "detail": "inference.started gemini-3.5-flash"
+    },
+    {
+      "atMs": 5,
+      "type": "mozaik.inference.started",
+      "producer": "Impact",
+      "detail": "inference.started gemini-3.5-flash"
+    },
+    {
+      "atMs": 2418,
+      "type": "mozaik.inference.completed",
+      "producer": "Trace",
+      "detail": "inference.completed provider model"
+    },
+    {
+      "atMs": 2602,
+      "type": "mozaik.inference.completed",
+      "producer": "Impact",
+      "detail": "inference.completed provider model"
+    },
+    {
+      "atMs": 2881,
+      "type": "mozaik.inference.completed",
+      "producer": "Dependency",
+      "detail": "inference.completed provider model"
+    }
+  ],
+  "limitations": [
+    "The report exposes IncidentMesh incident events, not raw provider request/response bodies or authorization metadata.",
+    "Raw provider request/response bodies are not preserved; IncidentMesh records normalized hypotheses, Mozaik interception/function-call events, and the Phase-2 model recommendation.",
+    "A single successful execution does not establish production reliability or MTTR improvement."
+  ]
+}
