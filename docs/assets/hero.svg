@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="620" viewBox="0 0 1200 620" role="img" aria-labelledby="title desc">
-  <title id="title">IncidentMesh: concurrent incident response that stops unsafe actions</title>
-  <desc id="desc">Trace, Dependency, and Impact share evidence. The Safety Gate blocks rollback_production, Mozaik intercepts the action, and rewrites it to request_corroboration.</desc>
+  <title id="title">IncidentMesh: concurrent incident response that gates risky actions</title>
+  <desc id="desc">Trace, Dependency, and Impact share evidence. In the canonical blocked path, the Safety Gate blocks rollback_production, Mozaik intercepts the call, and rewrites it to request_corroboration.</desc>
 
   <rect width="1200" height="620" rx="22" fill="#0d1117"/>
   <rect x="1" y="1" width="1198" height="618" rx="21" fill="none" stroke="#30363d" stroke-width="2"/>
@@ -20,7 +20,7 @@
   <text x="154" y="95" fill="#f0f6fc" font-size="50" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-weight="720" letter-spacing="-1.4">IncidentMesh</text>
 
   <text x="54" y="170" fill="#f0f6fc" font-size="36" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-weight="680" letter-spacing="-0.7">Concurrent incident response</text>
-  <text x="54" y="214" fill="#f0f6fc" font-size="36" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-weight="680" letter-spacing="-0.7">that stops unsafe actions.</text>
+  <text x="54" y="214" fill="#f0f6fc" font-size="36" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-weight="680" letter-spacing="-0.7">that gates risky actions.</text>
   <text x="54" y="250" fill="#8b949e" font-size="19" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">Independent responders share evidence before production decisions cross the safety boundary.</text>
 
   <!-- Core causal moment -->
