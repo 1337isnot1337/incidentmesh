@@ -1,21 +1,14 @@
 <p align="center">
-  <img src="docs/assets/hero.svg" alt="IncidentMesh concurrent incident control: parallel responders feed shared evidence, the Safety Gate blocks rollback, and Mozaik rewrites rollback_production to request_corroboration before a canary replan" />
+  <img src="docs/assets/hero.svg" alt="IncidentMesh: Trace, Dependency, and Impact share evidence; the Safety Gate blocks rollback_production; the action is intercepted and rewritten to request_corroboration" />
 </p>
 
 <p align="center">
-  <a href="https://github.com/1337isnot1337/incidentmesh/actions/workflows/ci.yml"><img src="https://github.com/1337isnot1337/incidentmesh/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <img src="https://img.shields.io/badge/Node.js-%3E%3D20-339933?logo=nodedotjs&logoColor=white" alt="Node.js 20+" />
-  <img src="https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white" alt="TypeScript" />
-  <img src="https://img.shields.io/badge/Mozaik-4.0.5-111827" alt="Mozaik 4.0.5" />
+  <a href="#demo"><strong>Demo</strong></a> ·
+  <a href="#quick-start"><strong>Quick start</strong></a> ·
+  <a href="#causal-concurrency-ablation"><strong>Causal proof</strong></a>
 </p>
 
-<p align="center">
-  <a href="#demo">Demo</a> ·
-  <a href="#judge-verification">Verify</a> ·
-  <a href="#how-it-works">How it works</a>
-</p>
-
-IncidentMesh is a concurrent incident-response prototype built on [Mozaik](https://mozaik.jigjoy.ai/). In the canonical zero-key demo, **Trace**, **Dependency**, and **Impact** publish into one typed `IncidentState`; by the fixed 205 ms action boundary all three hypotheses are present, producing **two contradictions** and `SAFETY GATE: BLOCKED`. Mozaik then intercepts `rollback_production`, rewrites the executable transition to `request_corroboration`, executes the safe tool, and Impact deterministically replans to a canary.
+<p align="center">Same evidence, same safety policy, same action boundary. Concurrency determines whether the system has enough information to choose a safe action in time.</p>
 
 ## Demo
 
@@ -24,23 +17,15 @@ npm ci
 npm run demo
 ```
 
-A representative run reaches this sequence:
+The canonical report can be rendered as an auditable replay with `npm run replay:visual`:
 
-```text
-Trace       ───────────────┐
-Dependency  ─────────────────────┐   3 / 3 responder pairs overlap
-Impact      ───────────────────────────┐
-                                 │
-3 hypotheses → 2 contradictions → SAFETY GATE: BLOCKED
-                                 ↓
-                         Impact: canary plan
-                                 ↓
-                  Trace + Dependency: corroboration
-```
+<p align="center">
+  <img src="docs/evidence/replay.svg" alt="IncidentMesh canonical replay showing overlapping responder spans, the fixed action boundary, a blocked Safety Gate, Mozaik interception, and the safe rewrite" />
+</p>
 
 The exact millisecond values vary slightly by machine. The responder overlap, three hypotheses, two contradictions, blocked gate, adaptive canary, and two follow-up evidence responses are deterministic.
 
-The deterministic demo now traverses the actual Mozaik function-call loop. At the fixed action boundary, the gate evaluates the evidence already in shared state and becomes blocked; Mozaik then emits `interception.started`, `SafetyGateInterception` rewrites the call to `request_corroboration`, Mozaik emits `interception.finished`, and the registered safe tool executes before Impact replans to a canary. This is framework execution, not a printed simulation of interception.
+The deterministic demo traverses the actual Mozaik function-call loop. At the fixed action boundary, the gate evaluates the evidence already in shared state and becomes blocked; Mozaik then emits `interception.started`, `SafetyGateInterception` rewrites the call to `request_corroboration`, Mozaik emits `interception.finished`, and the registered safe tool executes before Impact replans to a canary. This is framework execution, not a printed simulation of interception.
 
 See [`docs/demo.md`](docs/demo.md) for the 90-second judge narration.
 
@@ -57,7 +42,6 @@ The important claims are directly inspectable:
 | The gate decision changes another participant's behavior | Impact's `blockedAdaptation` handler reacts to the blocked decision and emits `incident.mitigation.replanned` |
 | The new plan causes peer follow-up evidence | Trace and Dependency react to `mitigation.replanned` and emit `incident.evidence.added` |
 | Blocked rollback is intercepted end to end | the canonical zero-key demo emits Mozaik `interception.started` / `interception.finished`, then executes `request_corroboration`; tests assert the same path |
-
 
 ## Causal concurrency ablation
 
@@ -102,6 +86,13 @@ cd incidentmesh
 npm ci
 npm run demo
 ```
+
+<p>
+  <a href="https://github.com/1337isnot1337/incidentmesh/actions/workflows/ci.yml"><img src="https://github.com/1337isnot1337/incidentmesh/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <img src="https://img.shields.io/badge/Node.js-%3E%3D20-339933?logo=nodedotjs&logoColor=white" alt="Node.js 20+" />
+  <img src="https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Mozaik-4.0.5-111827" alt="Mozaik 4.0.5" />
+</p>
 
 Other useful commands:
 
