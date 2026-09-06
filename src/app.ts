@@ -905,7 +905,7 @@ function emitActionBoundaryDecision(
   }), participantId)
 }
 
-function gateHandlers(state: IncidentState, dryRun: boolean, sendEvent: (event: SemanticEvent, senderId: string) => void): SituationHandler[] {
+function gateHandlers(state: IncidentState, sendEvent: (event: SemanticEvent, senderId: string) => void): SituationHandler[] {
   const collectHypothesis: SituationHandler = {
     specification: isPeerType(HYPOTHESIS_EMITTED),
     processor: {
@@ -1076,7 +1076,7 @@ export async function runIncidentScenario(options: ScenarioOptions = {}): Promis
     capabilities: ["timeline"],
     handlers: [...observerHandlers(state), ...frameworkObserverHandlers(state)],
   })
-  const gate = createHuman({ name: "Safety Gate", capabilities: ["risk-control", "interception"], handlers: gateHandlers(state, dryRun, sendEvent) })
+  const gate = createHuman({ name: "Safety Gate", capabilities: ["risk-control", "interception"], handlers: gateHandlers(state, sendEvent) })
   const responders = ROLES.map((role) => {
     const responder = createAgent({
       name: ROLE_CONFIG[role].name,
