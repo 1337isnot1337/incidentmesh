@@ -1,51 +1,47 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="760" viewBox="0 0 1280 760" role="img" aria-labelledby="title desc">
-<title id="title">IncidentMesh canonical replay</title>
-<desc id="desc">Data-derived replay showing concurrent responder spans, the fixed rollback action boundary, a blocked Safety Gate, Mozaik interception, canary replanning, and corroboration.</desc>
-<rect width="1280" height="760" fill="#0b1220"/>
-<rect x="24" y="24" width="1232" height="712" rx="26" fill="#0f172a" stroke="#334155" stroke-width="2"/>
-<text x="64" y="78" fill="#f8fafc" font-family="ui-sans-serif,system-ui,sans-serif" font-size="32" font-weight="800">IncidentMesh — canonical action-boundary replay</text>
-<text x="64" y="111" fill="#cbd5e1" font-family="ui-sans-serif,system-ui,sans-serif" font-size="18">Parallel evidence changes which function call crosses the safety boundary.</text>
-<text x="64" y="172" fill="#e2e8f0" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="17">Trace</text>
-<line x1="245" y1="165" x2="1190" y2="165" stroke="#1e293b" stroke-width="20" stroke-linecap="round"/>
-<line x1="251.3210702341137" y1="165" x2="627.4247491638796" y2="165" stroke="#94a3b8" stroke-width="20" stroke-linecap="round"/>
-<text x="637.4247491638796" y="171" fill="#94a3b8" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13">2–121 ms</text>
-<text x="64" y="232" fill="#e2e8f0" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="17">Dependency</text>
-<line x1="245" y1="225" x2="1190" y2="225" stroke="#1e293b" stroke-width="20" stroke-linecap="round"/>
-<line x1="254.48160535117057" y1="225" x2="785.4515050167223" y2="225" stroke="#94a3b8" stroke-width="20" stroke-linecap="round"/>
-<text x="795.4515050167223" y="231" fill="#94a3b8" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13">3–171 ms</text>
-<text x="64" y="292" fill="#e2e8f0" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="17">Impact</text>
-<line x1="245" y1="285" x2="1190" y2="285" stroke="#1e293b" stroke-width="20" stroke-linecap="round"/>
-<line x1="254.48160535117057" y1="285" x2="943.4782608695651" y2="285" stroke="#94a3b8" stroke-width="20" stroke-linecap="round"/>
-<text x="953.4782608695651" y="291" fill="#94a3b8" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13">3–221 ms</text>
-<line x1="892.9096989966555" y1="138" x2="892.9096989966555" y2="648" stroke="#f59e0b" stroke-width="2" stroke-dasharray="8 7"/>
-<text x="820.9096989966555" y="139" fill="#fbbf24" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13">fixed boundary 205 ms</text>
-<text x="64" y="355" fill="#f8fafc" font-family="ui-sans-serif,system-ui,sans-serif" font-size="20" font-weight="700">Causal action path</text>
-<circle cx="399.866220735786" cy="397" r="6" fill="#cbd5e1"/>
-<line x1="399.866220735786" y1="397" x2="1190" y2="397" stroke="#1e293b" stroke-width="1"/>
-<text x="64" y="402" fill="#e2e8f0" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="14" font-weight="400"> 49 ms  rollback pending</text>
-<circle cx="905.551839464883" cy="434" r="6" fill="#f59e0b"/>
-<line x1="905.551839464883" y1="434" x2="1190" y2="434" stroke="#1e293b" stroke-width="1"/>
-<text x="64" y="439" fill="#fca5a5" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="14" font-weight="700">209 ms  SAFETY GATE: BLOCKED</text>
-<circle cx="915.0334448160535" cy="471" r="6" fill="#cbd5e1"/>
-<line x1="915.0334448160535" y1="471" x2="1190" y2="471" stroke="#1e293b" stroke-width="1"/>
-<text x="64" y="476" fill="#e2e8f0" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="14" font-weight="400">212 ms  Mozaik interception</text>
-<circle cx="915.0334448160535" cy="508" r="6" fill="#cbd5e1"/>
-<line x1="915.0334448160535" y1="508" x2="1190" y2="508" stroke="#1e293b" stroke-width="1"/>
-<text x="64" y="513" fill="#e2e8f0" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="14" font-weight="400">212 ms  rollback → request_corroboration</text>
-<circle cx="915.0334448160535" cy="545" r="6" fill="#22c55e"/>
-<line x1="915.0334448160535" y1="545" x2="1190" y2="545" stroke="#1e293b" stroke-width="1"/>
-<text x="64" y="550" fill="#e2e8f0" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="14" font-weight="400">212 ms  safe tool executed</text>
-<circle cx="1013.010033444816" cy="582" r="6" fill="#22c55e"/>
-<line x1="1013.010033444816" y1="582" x2="1190" y2="582" stroke="#1e293b" stroke-width="1"/>
-<text x="64" y="587" fill="#e2e8f0" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="14" font-weight="400">243 ms  Impact → canary</text>
-<circle cx="1092.0234113712374" cy="619" r="6" fill="#22c55e"/>
-<line x1="1092.0234113712374" y1="619" x2="1190" y2="619" stroke="#1e293b" stroke-width="1"/>
-<text x="64" y="624" fill="#e2e8f0" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="14" font-weight="400">268 ms  Trace corroborates</text>
-<circle cx="1148.913043478261" cy="656" r="6" fill="#22c55e"/>
-<line x1="1148.913043478261" y1="656" x2="1190" y2="656" stroke="#1e293b" stroke-width="1"/>
-<text x="64" y="661" fill="#e2e8f0" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="14" font-weight="400">286 ms  Dependency corroborates</text>
-<rect x="64" y="663" width="1152" height="50" rx="12" fill="#111827"/>
-<text x="84" y="694" fill="#cbd5e1" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="15">3/3 responder pairs overlap</text>
-<text x="380" y="694" fill="#fbbf24" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="15">3 hypotheses → 2 contradictions → BLOCKED</text>
-<text x="785" y="694" fill="#86efac" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="15">rollback → request_corroboration → canary → 2 evidence</text>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="864" viewBox="0 0 960 864" role="img" aria-labelledby="title desc">
+<title id="title">IncidentMesh canonical replay</title><desc id="desc">Measured responder spans, configured timer and observed callback, followed by recorded action events. Source: companion replay.json.</desc>
+<rect width="960" height="864" rx="16" fill="#101820"/><g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+<text x="40" y="56" fill="#f0f5f7" font-size="32" font-weight="700">Evidence arrives before the action.</text>
+<text x="40" y="92" fill="#b0c1cc" font-size="21">Canonical replay · measured time in milliseconds</text>
+<text x="40" y="181" fill="#f0f5f7" font-size="23">Trace</text>
+<line x1="220" y1="174" x2="920" y2="174" stroke="#25343f" stroke-width="14" stroke-linecap="round"/>
+<line x1="224.68227424749165" y1="174" x2="503.27759197324417" y2="174" stroke="#72d5c2" stroke-width="14" stroke-linecap="round"/>
+<text x="220" y="204" fill="#b0c1cc" font-size="18">2–121 ms</text>
+<text x="40" y="245" fill="#f0f5f7" font-size="23">Dependency</text>
+<line x1="220" y1="238" x2="920" y2="238" stroke="#25343f" stroke-width="14" stroke-linecap="round"/>
+<line x1="227.02341137123744" y1="238" x2="620.3344481605351" y2="238" stroke="#72d5c2" stroke-width="14" stroke-linecap="round"/>
+<text x="220" y="268" fill="#b0c1cc" font-size="18">3–171 ms</text>
+<text x="40" y="309" fill="#f0f5f7" font-size="23">Impact</text>
+<line x1="220" y1="302" x2="920" y2="302" stroke="#25343f" stroke-width="14" stroke-linecap="round"/>
+<line x1="227.02341137123744" y1="302" x2="737.391304347826" y2="302" stroke="#72d5c2" stroke-width="14" stroke-linecap="round"/>
+<text x="220" y="332" fill="#b0c1cc" font-size="18">3–221 ms</text>
+<line x1="699.933110367893" y1="126" x2="699.933110367893" y2="337" stroke="#ffb18a" stroke-width="2" stroke-dasharray="6 5"/>
+<text x="687.933110367893" y="133" text-anchor="end" fill="#ffb18a" font-size="18">Configured: 205 ms</text>
+<path d="M40 365 H920" stroke="#30404b"/>
+<text x="40" y="405" fill="#f0f5f7" font-size="25" font-weight="700">Action event ledger</text>
+<text x="920" y="405" text-anchor="end" fill="#b0c1cc" font-size="20">Observed callback: 209 ms</text>
+<text x="40" y="456" fill="#b0c1cc" font-size="21" font-family="ui-monospace, SFMono-Regular, Consolas, monospace">49 ms</text>
+<circle cx="195" cy="449" r="4" fill="#e0e9ee"/>
+<text x="220" y="456" fill="#e0e9ee" font-size="23" font-weight="400">Rollback pending</text>
+<text x="40" y="504" fill="#b0c1cc" font-size="21" font-family="ui-monospace, SFMono-Regular, Consolas, monospace">209 ms</text>
+<circle cx="195" cy="497" r="4" fill="#ffb18a"/>
+<text x="220" y="504" fill="#ffb18a" font-size="23" font-weight="700">Safety Gate: BLOCKED</text>
+<text x="40" y="552" fill="#b0c1cc" font-size="21" font-family="ui-monospace, SFMono-Regular, Consolas, monospace">212 ms</text>
+<circle cx="195" cy="545" r="4" fill="#e0e9ee"/>
+<text x="220" y="552" fill="#e0e9ee" font-size="23" font-weight="400">Mozaik interception</text>
+<text x="40" y="600" fill="#b0c1cc" font-size="21" font-family="ui-monospace, SFMono-Regular, Consolas, monospace">212 ms</text>
+<circle cx="195" cy="593" r="4" fill="#e0e9ee"/>
+<text x="220" y="600" fill="#e0e9ee" font-size="23" font-weight="400">Rewritten to request_corroboration</text>
+<text x="40" y="648" fill="#b0c1cc" font-size="21" font-family="ui-monospace, SFMono-Regular, Consolas, monospace">212 ms</text>
+<circle cx="195" cy="641" r="4" fill="#8ee3c7"/>
+<text x="220" y="648" fill="#8ee3c7" font-size="23" font-weight="400">Safe tool executed</text>
+<text x="40" y="696" fill="#b0c1cc" font-size="21" font-family="ui-monospace, SFMono-Regular, Consolas, monospace">243 ms</text>
+<circle cx="195" cy="689" r="4" fill="#8ee3c7"/>
+<text x="220" y="696" fill="#8ee3c7" font-size="23" font-weight="400">Impact → canary</text>
+<text x="40" y="744" fill="#b0c1cc" font-size="21" font-family="ui-monospace, SFMono-Regular, Consolas, monospace">268 ms</text>
+<circle cx="195" cy="737" r="4" fill="#8ee3c7"/>
+<text x="220" y="744" fill="#8ee3c7" font-size="23" font-weight="400">Trace corroborates</text>
+<text x="40" y="792" fill="#b0c1cc" font-size="21" font-family="ui-monospace, SFMono-Regular, Consolas, monospace">286 ms</text>
+<circle cx="195" cy="785" r="4" fill="#8ee3c7"/>
+<text x="220" y="792" fill="#8ee3c7" font-size="23" font-weight="400">Dependency corroborates</text>
+</g></svg>
