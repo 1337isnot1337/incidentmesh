@@ -1,6 +1,6 @@
 # IncidentMesh handoff — 2026-09-05
 
-JIGJOY_STATUS=SUBMISSION_READY
+JIGJOY_STATUS=SUBMITTED
 
 - Core narrative: three independent investigators disagree, and that disagreement changes what the system is allowed to do.
 - Product: concurrent incident-response agents on `@mozaik-ai/core@4.0.5`.
@@ -22,7 +22,7 @@ JIGJOY_STATUS=SUBMISSION_READY
 - Replay surface: `npm run replay:visual` generates SVG + JSON from the canonical report for a submission-video timeline.
 - Presentation: product-first README, causal hero, repository-owned social-preview asset, explicit limitations, concise architecture, and CI workflow.
 - License: still `UNLICENSED`; no license was selected implicitly.
-- Submission status: not submitted. Official submission remains an operator decision; the form permits later resubmission and judges the latest entry.
+- Submission status: submitted and publicly visible at https://build.jigjoy.ai/gallery/incidentmesh-40ad9c. The form permits later resubmission and judges the latest entry.
 
 Remaining competitive gap: no sanitized authenticated provider evidence has been captured yet.
 
