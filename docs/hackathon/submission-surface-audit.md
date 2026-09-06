@@ -6,6 +6,10 @@ Repository correctness and public submission health are separate release gates.
 
 On 2026-09-06, the gallery index listed `incidentmesh-40ad9c`, while `GET https://hackathon-api.jigjoy.ai/gallery/incidentmesh-40ad9c` returned HTTP 404. Comparison entries returned healthy detail records. Do not assume that stale slug is still authoritative.
 
+## Current public health
+
+A later logged-out check on 2026-09-06 returned HTTP 200 for the detail API and public page at `incidentmesh-40ad9c`. The record contained the repository URL and all four submitted screenshots. Its description and concurrency fields still predate the final integration, so this recovery does not replace the final post-merge resubmission check.
+
 ## Final recovery check
 
 After resubmission:

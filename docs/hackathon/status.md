@@ -29,4 +29,4 @@ No live production mutation, production readiness, MTTR, generic speedup, or dyn
 
 ## Submission status
 
-The prior public slug was `incidentmesh-40ad9c`, but its detail endpoint previously returned 404 even while the gallery index listed it. Final resubmission and logged-out detail verification remain operator release gates; see [`submission-surface-audit.md`](submission-surface-audit.md).
+The public slug is currently `incidentmesh-40ad9c`. A logged-out check on 2026-09-06 returned HTTP 200 for the gallery detail API, gallery page, and repository, and the detail record listed four screenshots. The public fields still contain the pre-integration description and concurrency explanation; after this branch is merged, final resubmission and a second logged-out verification remain operator release gates. See [`submission-surface-audit.md`](submission-surface-audit.md).
