@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">IncidentMesh mark</title>
+  <desc id="desc">Three incident signals converge through a shared mesh into a safety gate.</desc>
+  <rect x="4" y="4" width="120" height="120" rx="28" fill="#0b1220" stroke="#334155" stroke-width="2"/>
+  <path d="M31 35 L64 64 L97 35 M31 93 L64 64 L97 93" fill="none" stroke="#64748b" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="31" cy="35" r="9" fill="#38bdf8"/>
+  <circle cx="97" cy="35" r="9" fill="#2dd4bf"/>
+  <circle cx="31" cy="93" r="9" fill="#a78bfa"/>
+  <circle cx="97" cy="93" r="9" fill="#f59e0b"/>
+  <rect x="53" y="53" width="22" height="22" rx="6" fill="#e2e8f0"/>
+  <path d="M60 64 l3 3 6-7" fill="none" stroke="#0b1220" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

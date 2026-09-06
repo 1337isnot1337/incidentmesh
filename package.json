@@ -10,10 +10,10 @@
     "scripts",
     "src",
     "README.md",
-    "RELEASE-NOTES.md",
     "tsconfig.json",
     "tsconfig.build.json",
-    "npm-shrinkwrap.json"
+    "npm-shrinkwrap.json",
+    "docs"
   ],
   "engines": {
     "node": ">=20"
@@ -39,5 +39,19 @@
   "devDependencies": {
     "tsx": "^4.19.4",
     "typescript": "^5.3.3"
-  }
+  },
+  "description": "Concurrent incident-response agents with shared state, adaptive mitigation, and production-action interception.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/1337isnot1337/incidentmesh.git"
+  },
+  "homepage": "https://github.com/1337isnot1337/incidentmesh#readme",
+  "keywords": [
+    "mozaik",
+    "multi-agent",
+    "incident-response",
+    "concurrency",
+    "ai-agents",
+    "typescript"
+  ]
 }

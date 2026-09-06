@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="430" viewBox="0 0 1200 430" role="img" aria-labelledby="title desc">
+  <title id="title">IncidentMesh concurrent incident-response timeline</title>
+  <desc id="desc">Trace, Dependency, and Impact investigate simultaneously. Their hypotheses meet at a shared Safety Gate, which blocks rollback and triggers a canary plan with corroboration.</desc>
+  <rect width="1200" height="430" rx="24" fill="#0b1220"/>
+  <rect x="1" y="1" width="1198" height="428" rx="23" fill="none" stroke="#334155" stroke-width="2"/>
+
+  <text x="54" y="62" fill="#f8fafc" font-size="28" font-family="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-weight="700">One incident. Three investigations. One shared safety decision.</text>
+  <text x="54" y="94" fill="#94a3b8" font-size="16" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">incident.opened</text>
+
+  <line x1="156" y1="122" x2="156" y2="332" stroke="#475569" stroke-width="2" stroke-dasharray="6 8"/>
+  <circle cx="156" cy="151" r="6" fill="#f8fafc"/>
+  <circle cx="156" cy="216" r="6" fill="#f8fafc"/>
+  <circle cx="156" cy="281" r="6" fill="#f8fafc"/>
+
+  <text x="54" y="157" fill="#cbd5e1" font-size="17" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">Trace</text>
+  <text x="54" y="222" fill="#cbd5e1" font-size="17" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">Dependency</text>
+  <text x="54" y="287" fill="#cbd5e1" font-size="17" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">Impact</text>
+
+  <rect x="177" y="137" width="280" height="28" rx="8" fill="#0c4a6e"/>
+  <rect x="177" y="202" width="365" height="28" rx="8" fill="#115e59"/>
+  <rect x="177" y="267" width="455" height="28" rx="8" fill="#5b21b6"/>
+  <text x="193" y="157" fill="#e0f2fe" font-size="14" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">request-path evidence</text>
+  <text x="193" y="222" fill="#ccfbf1" font-size="14" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">deploy + dependency evidence</text>
+  <text x="193" y="287" fill="#ede9fe" font-size="14" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">customer impact evidence</text>
+
+  <path d="M457 151 C560 151 596 174 678 203" fill="none" stroke="#38bdf8" stroke-width="2"/>
+  <path d="M542 216 C595 216 623 216 678 216" fill="none" stroke="#2dd4bf" stroke-width="2"/>
+  <path d="M632 281 C646 281 653 257 678 229" fill="none" stroke="#a78bfa" stroke-width="2"/>
+
+  <rect x="678" y="166" width="196" height="100" rx="16" fill="#111827" stroke="#f59e0b" stroke-width="2"/>
+  <text x="704" y="199" fill="#fbbf24" font-size="17" font-family="ui-sans-serif, system-ui, sans-serif" font-weight="700">Safety Gate</text>
+  <text x="704" y="225" fill="#e2e8f0" font-size="14" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">2 conflicting causes</text>
+  <text x="704" y="247" fill="#fca5a5" font-size="14" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">ROLLBACK BLOCKED</text>
+
+  <path d="M874 216 H932" fill="none" stroke="#f59e0b" stroke-width="3"/>
+  <path d="M924 208 L934 216 L924 224" fill="none" stroke="#f59e0b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="934" y="166" width="214" height="100" rx="16" fill="#111827" stroke="#22c55e" stroke-width="2"/>
+  <text x="958" y="199" fill="#86efac" font-size="17" font-family="ui-sans-serif, system-ui, sans-serif" font-weight="700">Adaptive plan</text>
+  <text x="958" y="225" fill="#e2e8f0" font-size="14" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">canary + corroboration</text>
+  <text x="958" y="247" fill="#cbd5e1" font-size="14" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">2 evidence responses</text>
+
+  <rect x="54" y="345" width="1094" height="44" rx="12" fill="#111827"/>
+  <text x="78" y="373" fill="#94a3b8" font-size="15" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">3 / 3 responder pairs overlap</text>
+  <text x="397" y="373" fill="#94a3b8" font-size="15" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">shared IncidentState</text>
+  <text x="681" y="373" fill="#94a3b8" font-size="15" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">semantic event fan-out</text>
+  <text x="961" y="373" fill="#94a3b8" font-size="15" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">provider-free demo</text>
+</svg>
