@@ -12,6 +12,8 @@ recorded Trace, Dependency, and Impact provider-call windows with **1,363 ms of 
 
 This run proves fresh authenticated **Phase-1 provider concurrency against the frozen release SHA**. It does **not** prove the authenticated Phase-2 interception path, because this stochastic run did not produce a `rollback_production` proposal and therefore did not traverse `SafetyGateInterception`.
 
+[Verbatim raw JSON receipt](release-phase1-provider-run.json) · [Scoped manifest](release-phase1-provider-manifest.json)
+
 ## Capture provenance
 
 - UTC: `2026-09-06T22:51:49Z` → `2026-09-06T22:51:54Z`
@@ -44,6 +46,8 @@ Common three-way provider-call intersection:
 
 These are provider-call windows. They are not presented as proof of simultaneous token generation inside Google's model servers.
 
+The raw receipt also contains top-level `participants` and `overlap` fields for broader application participant spans. Those spans begin slightly earlier than the provider calls. The provider-call figures above are independently derived from the raw receipt's `mozaik.inference.started` / `mozaik.inference.completed` entries in `inferenceEvents`, not from the broader participant-span `overlap` object.
+
 ## Runtime result
 
 - 3 / 3 responder hypotheses accepted
@@ -71,12 +75,12 @@ That rejection does not turn the observed Phase-1 provider intervals into synthe
 
 ## Preserved capture hashes
 
-The raw attempt-3 artifacts were preserved outside the repository before any cleanup:
+The uploaded capture archive was secret-scanned before publication. The exact attempt-3 raw JSON is now committed verbatim at [`release-phase1-provider-run.json`](release-phase1-provider-run.json).
 
-- raw JSON receipt SHA-256: `6a53fd13cac4eae9e02ba2e1361881432a98e9cc23e58808ace6b006c1ebf313`
-- raw Markdown receipt SHA-256: `48270f6e5d6f58223942a9d5493d376415557457207be302844ba6096d0fde7f`
+- committed raw JSON receipt SHA-256: `6a53fd13cac4eae9e02ba2e1361881432a98e9cc23e58808ace6b006c1ebf313`
+- preserved raw Markdown receipt SHA-256: `48270f6e5d6f58223942a9d5493d376415557457207be302844ba6096d0fde7f`
 
-This committed file is a scoped, human-readable release-evidence summary of that preserved capture; it is not a replacement for the raw attempt artifact.
+The raw generated Markdown and the full command/validator transcript remain preserved outside the repository because they add little judge-facing information beyond the verbatim JSON and this scoped explanation.
 
 ## Relationship to the historical full receipt
 
