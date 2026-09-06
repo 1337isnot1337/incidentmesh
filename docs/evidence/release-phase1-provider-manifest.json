@@ -1,0 +1,80 @@
+{
+  "schema": "incidentmesh.release-phase1-provider-evidence/v1",
+  "artifactType": "scoped-release-provider-summary",
+  "claimScope": "fresh authenticated Phase-1 provider concurrency only",
+  "capture": {
+    "attempt": 3,
+    "startedAtUtc": "2026-09-06T22:51:49Z",
+    "endedAtUtc": "2026-09-06T22:51:54Z",
+    "sourceSha": "e98376445c42ea532cbe4993095911d932a3a57a",
+    "provider": "Google",
+    "model": "gemini-3.5-flash-lite",
+    "node": "v24.19.0",
+    "npm": "11.17.0",
+    "mozaik": "4.0.5",
+    "baselineTests": {
+      "passed": 37,
+      "total": 37
+    },
+    "runtimeChanges": false
+  },
+  "phase1": {
+    "complete": true,
+    "acceptedHypotheses": 3,
+    "gate": "blocked",
+    "providerCallWindowsMs": {
+      "trace": {
+        "start": 4,
+        "end": 1458,
+        "duration": 1454
+      },
+      "dependency": {
+        "start": 4,
+        "end": 1495,
+        "duration": 1491
+      },
+      "impact": {
+        "start": 4,
+        "end": 1367,
+        "duration": 1363
+      }
+    },
+    "pairwiseOverlapMs": {
+      "trace_dependency": 1454,
+      "trace_impact": 1363,
+      "dependency_impact": 1363
+    },
+    "commonThreeWayOverlap": {
+      "startMs": 4,
+      "endMs": 1367,
+      "durationMs": 1363
+    }
+  },
+  "phase2": {
+    "complete": false,
+    "actionControllerProviderInferenceCount": 2,
+    "rollbackProductionProposed": false,
+    "interceptionStarted": false,
+    "interceptionRewritten": false,
+    "interceptionObserved": false,
+    "executedSafeTool": "request_corroboration",
+    "providerRecommendationRecorded": true,
+    "productionMutationObserved": false,
+    "validatorResult": "rejected-incomplete-authenticated-phase2"
+  },
+  "limitations": [
+    "This scoped summary does not certify the authenticated Phase-2 interception path.",
+    "The run did not propose rollback_production, so no rollback interception rewrite could be observed.",
+    "Provider-call overlap is not proof of simultaneous token generation inside the provider.",
+    "The raw attempt artifact is preserved externally and is identified here by SHA-256 rather than committed verbatim."
+  ],
+  "preservedRawArtifacts": {
+    "rawJsonSha256": "6a53fd13cac4eae9e02ba2e1361881432a98e9cc23e58808ace6b006c1ebf313",
+    "rawMarkdownSha256": "48270f6e5d6f58223942a9d5493d376415557457207be302844ba6096d0fde7f"
+  },
+  "historicalFullReceipt": {
+    "path": "docs/evidence/real-provider-run.json",
+    "commonThreeWayOverlapMs": 1389,
+    "supportsAuthenticatedPhase2Interception": true
+  }
+}
