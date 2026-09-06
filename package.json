@@ -1,0 +1,43 @@
+{
+  "name": "incidentmesh-concurrent-response",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "license": "UNLICENSED",
+  "packageManager": "npm@11.17.0",
+  "files": [
+    "dist",
+    "scripts",
+    "src",
+    "README.md",
+    "RELEASE-NOTES.md",
+    "tsconfig.json",
+    "tsconfig.build.json",
+    "npm-shrinkwrap.json"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "tsx src/index.ts",
+    "demo": "tsx src/demo.ts",
+    "benchmark": "tsx src/benchmark.ts",
+    "demo:built": "node dist/demo.js",
+    "replay": "tsx src/replay.ts",
+    "replay:built": "node dist/replay.js",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test src/*.test.ts",
+    "check": "npm run typecheck && npm test",
+    "verify:built": "node dist/verify.js",
+    "verify": "npm run check && npm run build && npm run verify:built"
+  },
+  "dependencies": {
+    "@mozaik-ai/core": "4.0.5"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.4",
+    "typescript": "^5.3.3"
+  }
+}
