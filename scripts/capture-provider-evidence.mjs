@@ -16,7 +16,7 @@ function usage() {
   console.log([
     "usage:",
     "  node scripts/capture-provider-evidence.mjs --check [--model <model>]",
-    "  node scripts/capture-provider-evidence.mjs --execute [--model <model>]",
+    "  node scripts/capture-provider-evidence.mjs --execute [--model <model>] [--phase1-only]",
     "",
     "--check inspects only model/provider selection and credential variable names.",
     "--execute performs one bounded real-model IncidentMesh run and writes evidence only on success.",
@@ -135,6 +135,27 @@ function overlapDetails(spans) {
   return { pairCount: pairs.length, pairs }
 }
 
+function peerAwarenessDetails(events, spans) {
+  const spanByRole = new Map(spans.map((span) => [span.role, span]))
+  return events
+    .filter((event) => event.type === "awareness.peer-observed")
+    .map((event) => {
+      const match = event.detail.match(/^(Trace|Dependency|Impact) observed (trace|dependency|impact) hypothesis$/i)
+      const observer = match?.[1]?.toLowerCase() ?? null
+      const sourceRole = match?.[2]?.toLowerCase() ?? null
+      const span = observer === null ? undefined : spanByRole.get(observer)
+      const activeDuringOwnInference = span !== undefined
+        && event.atMs >= span.startedAtMs
+        && (span.completedAtMs == null || event.atMs < span.completedAtMs)
+      return {
+        atMs: event.atMs,
+        observer,
+        sourceRole,
+        activeDuringOwnInference,
+      }
+    })
+}
+
 function markdownEvidence(evidence, nodeVersion, mozaikVersion, command) {
   const participantLines = evidence.participants.map((p) => `- ${p.role}: ${p.startedAtMs}ms -> ${p.completedAtMs ?? "not completed"}ms`).join("\n")
   const limitations = evidence.limitations.map((item) => `- ${item}`).join("\n")
@@ -158,6 +179,8 @@ function markdownEvidence(evidence, nodeVersion, mozaikVersion, command) {
     `## Participants\n\n${participantLines}\n\n` +
     `## Concurrency\n\n` +
     `Overlapping participant pairs: ${evidence.overlap.pairCount}.\n\n` +
+    `Peer-awareness observations recorded by runtime participants: ${evidence.peerAwareness.length}; ` +
+    `${evidence.peerAwareness.filter((item) => item.activeDuringOwnInference).length} occurred while the observer's own inference span was still active.\n\n` +
     `## Runtime facts\n\n` +
     `- Hypotheses received by shared state: ${evidence.hypotheses.length}\n` +
     `- Adaptations recorded: ${evidence.adaptations.length}\n` +
@@ -232,6 +255,7 @@ async function main() {
     participants: report.spans,
     events: report.timeline,
     overlap: overlapDetails(report.spans),
+    peerAwareness: peerAwarenessDetails(report.timeline, report.spans),
     gateDecision: report.gateDecision,
     interceptionObserved: report.action?.intercepted === true && report.timeline.some((event) => event.type === "mozaik.interception.rewritten"),
     action: report.action,

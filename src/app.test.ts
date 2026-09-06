@@ -274,7 +274,10 @@ test("explicit Dependency timeout degrades the role and terminates through the s
 class ScriptedTwoPhaseInferenceRunner implements InferenceRunner {
   readonly mitigationPrompts: string[] = []
 
-  constructor(private readonly hangDependency = false) {}
+  constructor(
+    private readonly hangDependency = false,
+    private readonly consistentEvidence = false,
+  ) {}
 
   async run(request: InferenceInput): Promise<InferenceOutput> {
     const items = request.context.getItems()
@@ -316,10 +319,10 @@ class ScriptedTwoPhaseInferenceRunner implements InferenceRunner {
     }
 
     const fixture = role === "trace"
-      ? { claim: "trace sees cache churn", confidence: 0.85, rootCause: "cache-stampede" }
+      ? { claim: "trace sees cache churn", confidence: 0.85, rootCause: this.consistentEvidence ? "shared-cause" : "cache-stampede" }
       : role === "dependency"
-        ? { claim: "dependency sees deploy-linked pool wait", confidence: 0.82, rootCause: "deploy-8f3" }
-        : { claim: "impact sees regional checkout failures", confidence: 0.88, rootCause: "regional-impact" }
+        ? { claim: "dependency sees deploy-linked pool wait", confidence: 0.82, rootCause: this.consistentEvidence ? "shared-cause" : "deploy-8f3" }
+        : { claim: "impact sees regional checkout failures", confidence: 0.88, rootCause: this.consistentEvidence ? "shared-cause" : "regional-impact" }
     return {
       items: [ModelMessageItem.rehydrate({ text: JSON.stringify(fixture) })],
       tokenUsage: undefined,
@@ -331,6 +334,21 @@ class ScriptedTwoPhaseInferenceRunner implements InferenceRunner {
     yield SemanticEvent.create("inference.output", "scripted-two-phase-runner", await this.run(request))
   }
 }
+
+test("phase-1-only model runs settle as soon as all provider hypotheses complete", async () => {
+  const report = await runIncidentScenario({
+    dryRun: false,
+    phase1Only: true,
+    inferenceRunner: new ScriptedTwoPhaseInferenceRunner(),
+    timeoutMs: 2_000,
+  })
+
+  assert.equal(report.hypotheses.length, 3)
+  assert.equal(report.gateDecision, "blocked")
+  assert.equal(report.gateReason, "conflicting-evidence")
+  assert.equal(report.timeline.some((item) => item.type === "incident.scenario.timeout"), false)
+  assert.ok(report.elapsedMs < 2_000)
+})
 
 test("two-phase scripted model integration traverses the real post-aggregation interceptor", async () => {
   const runner = new ScriptedTwoPhaseInferenceRunner()
@@ -360,6 +378,24 @@ test("two-phase scripted model integration traverses the real post-aggregation i
   assert.match(mitigationPrompt, /deploy-8f3/)
   assert.match(mitigationPrompt, /regional-impact/)
   assert.match(mitigationPrompt, /Safety Gate: blocked \(conflicting-evidence\)/)
+})
+
+test("approved evidence allows the proposal-only rollback path without interception", async () => {
+  const report = await runIncidentScenario({
+    dryRun: false,
+    inferenceRunner: new ScriptedTwoPhaseInferenceRunner(false, true),
+    timeoutMs: 2_000,
+  })
+
+  assert.equal(report.hypotheses.length, 3)
+  assert.equal(report.gateDecision, "approved")
+  assert.equal(report.gateReason, "sufficient-consistent-evidence")
+  assert.equal(report.action.gateAtBoundary, "approved")
+  assert.equal(report.action.intercepted, false)
+  assert.equal(report.action.executedTool, "rollback_production")
+  assert.equal(report.timeline.some((item) => item.type === "mozaik.interception.rewritten"), false)
+  assert.ok(report.timeline.some((item) => item.type === "incident.action.rollback-tool-executed"))
+  assert.match(report.action.modelRecommendation ?? "", /5% canary/)
 })
 
 test("a generally hanging required model responder degrades at the evidence deadline", async () => {

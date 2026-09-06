@@ -136,19 +136,19 @@ OPENAI_API_KEY=... RUN_MODEL=1 MODEL=gpt-5.5 npm run dev
 
 Phase-1 peer observations happen in runtime handlers; peer hypotheses are not injected into those models. The Phase-2 controller receives the aggregate evidence. Its rollback calls pass through the same interception handler, and a rewritten tool result returns to the model loop.
 
-A scripted `InferenceRunner` integration test exercises the two-phase lifecycle through Mozaik's real loop. The committed Gemini receipt verifies authenticated Phase-1 responder concurrency; it does **not** claim a verified provider-backed Phase-2 tool-call execution.
+A scripted `InferenceRunner` integration test exercises this lifecycle through Mozaik's real loop. A separate [authenticated Gemini Phase-1 receipt](docs/evidence/real-provider-run.md) records one bounded run of all three responder model loops, and a derived [peer-awareness receipt](docs/evidence/peer-awareness.md) shows runtime observers receiving peer events while inference was still active; the full provider-backed Phase-2 tool-call path remains a separate limitation.
 
 [Provider setup, failure behavior, and evidence capture](docs/implementation.md#deterministic-and-provider-backed-modes)
 
 ## Verification
 
 ```bash
-npm run verify       # typecheck, 15 focused tests, production build, built smoke check
+npm run verify       # typecheck, 17 focused tests, production build, built smoke check
 npm run ablation     # causal action-boundary comparison
 npm run degradation  # explicit responder timeout
 ```
 
-The focused tests cover overlap, real Mozaik interception, fail-closed pending actions, complete approval, conflicting and incomplete boundary decisions, immutable boundary snapshots, late evidence, hanging/explicit responder degradation, confidence validation, producer-role binding, duplicate handling, the causal scheduling ablation, and the scripted two-phase model lifecycle.
+The focused tests cover overlap, real Mozaik interception, fail-closed pending actions, complete approval, conflicting and incomplete boundary decisions, immutable boundary snapshots, late evidence, hanging/explicit responder degradation, confidence validation, producer-role binding, duplicate handling, the causal scheduling ablation, phase-1 settling, the approved proposal-only path, and the scripted two-phase model lifecycle.
 
 <details>
 <summary>Additional commands and supporting measurements</summary>

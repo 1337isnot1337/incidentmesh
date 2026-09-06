@@ -851,7 +851,6 @@ function observerHandlers(state) {
                             : typeof payload.note === "string" ? payload.note
                                 : typeof payload.decision === "string" ? payload.decision
                                     : event.type;
-                    state.record(event.type, event.producerId, detail);
                     if (event.type === SPAN_STARTED && typeof payload.role === "string" && ROLES.includes(payload.role)) {
                         const role = payload.role;
                         if (!state.spans.has(role))
@@ -862,6 +861,9 @@ function observerHandlers(state) {
                         if (span && span.completedAtMs === undefined)
                             span.completedAtMs = Math.round(performance.now() - state.startedAt);
                     }
+                    // Update span state before notifying waiters through record(). This keeps
+                    // phase-settlement predicates from missing the final completion event.
+                    state.record(event.type, event.producerId, detail);
                 },
             },
         }];

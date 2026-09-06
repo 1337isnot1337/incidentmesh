@@ -1029,7 +1029,6 @@ function observerHandlers(state: IncidentState): SituationHandler[] {
             : typeof payload.note === "string" ? payload.note
               : typeof payload.decision === "string" ? payload.decision
                 : event.type
-        state.record(event.type, event.producerId, detail)
         if (event.type === SPAN_STARTED && typeof payload.role === "string" && ROLES.includes(payload.role as Role)) {
           const role = payload.role as Role
           if (!state.spans.has(role)) state.spans.set(role, { role, startedAtMs: Math.round(performance.now() - state.startedAt) })
@@ -1038,6 +1037,9 @@ function observerHandlers(state: IncidentState): SituationHandler[] {
           const span = state.spans.get(payload.role as Role)
           if (span && span.completedAtMs === undefined) span.completedAtMs = Math.round(performance.now() - state.startedAt)
         }
+        // Update span state before notifying waiters through record(). This keeps
+        // phase-settlement predicates from missing the final completion event.
+        state.record(event.type, event.producerId, detail)
       },
     },
   }]

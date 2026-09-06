@@ -65,4 +65,4 @@ It is roughly 2.3× in the deterministic fixture. It is not a claim about reason
 - replanned event driving two peer corroboration responses
 - canonical and incomplete-evidence end-to-end Mozaik rollback interception; rollback passes only on affirmative approval
 - two-phase model-mode lifecycle test: aggregate evidence → Phase-2 Action Controller → real interceptor → safe tool → follow-up model recommendation
-- 15 focused invariant tests, production build, built smoke verification, and GitHub Actions CI
+- 17 focused invariant tests, production build, built smoke verification, and GitHub Actions CI

@@ -19,6 +19,8 @@ This file summarizes one bounded provider-backed Phase-1 execution. It is eviden
 
 ## Provider inference windows
 
+This receipt was captured before the phase-1-only settlement wakeup fix. The three provider spans and inference events are complete by 2881 ms; the report's longer wall-clock duration reflects the old bookkeeping timeout, not a provider call that remained active.
+
 | Responder | Inference started | Inference completed | Duration |
 | --- | ---: | ---: | ---: |
 | Trace | 4 ms | 2,418 ms | 2,414 ms |

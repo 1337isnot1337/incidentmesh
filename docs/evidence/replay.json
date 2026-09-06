@@ -206,6 +206,18 @@
     },
     {
       "atMs": 205,
+      "type": "mozaik.inference.started",
+      "producer": "Action Controller",
+      "detail": "inference.started incidentmesh-deterministic-action"
+    },
+    {
+      "atMs": 205,
+      "type": "mozaik.inference.completed",
+      "producer": "Action Controller",
+      "detail": "inference.completed provider model"
+    },
+    {
+      "atMs": 205,
       "type": "mozaik.interception.started",
       "producer": "Action Controller",
       "detail": "InterceptionHandler received rollback_production"
@@ -239,6 +251,18 @@
       "type": "mozaik.function-call.completed",
       "producer": "Action Controller",
       "detail": "Mozaik function tool completed"
+    },
+    {
+      "atMs": 205,
+      "type": "mozaik.inference.started",
+      "producer": "Action Controller",
+      "detail": "inference.started incidentmesh-deterministic-action"
+    },
+    {
+      "atMs": 205,
+      "type": "mozaik.inference.completed",
+      "producer": "Action Controller",
+      "detail": "inference.completed provider model"
     },
     {
       "atMs": 218,

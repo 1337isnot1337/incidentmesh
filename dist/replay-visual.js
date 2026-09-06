@@ -44,6 +44,8 @@ const canonicalizeReport = async () => {
             return 180;
         if (item.type === "incident.action.execution-requested" || (item.type === "incident.gate.decision" && item.detail.includes("boundary hypotheses")))
             return 205;
+        if (item.type.startsWith("mozaik.inference."))
+            return 205;
         if (item.type.startsWith("mozaik.interception.") || item.type.startsWith("mozaik.function-call.") || item.type === "incident.action.safe-executed")
             return 205;
         if (item.type === "incident.mitigation.replanned")
