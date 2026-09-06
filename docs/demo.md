@@ -36,7 +36,7 @@ SafetyGateInterception
 request_corroboration
 ```
 
-Readable deterministic evidence: [`evidence/replay.md`](evidence/replay.md) and [`evidence/replay.svg`](evidence/replay.svg).
+Canonical deterministic evidence: [`evidence/replay.json`](evidence/replay.json) and [`evidence/replay.svg`](evidence/replay.svg).
 
 ## Reproduce the causal scheduling comparison
 
