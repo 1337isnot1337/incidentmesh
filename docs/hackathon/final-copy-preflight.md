@@ -56,7 +56,7 @@ for phrase in (
 ):
     assert phrase not in lower, f"unsafe/stale claim: {phrase}"
 
-assert "destructive rollback authorized | **no** | **no**" in readme
+assert "| Destructive rollback authorized | **no** | **no** |" in readme
 assert "docs/assets/gemini-proof.svg" in readme
 assert "1,389 ms" in readme
 assert "37 focused tests" in Path("docs/judge-guide.md").read_text()
