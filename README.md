@@ -1,5 +1,3 @@
-<img align="right" src="docs/assets/astra-credit.svg" width="148" height="44" alt="developed with gpt-6-astra" />
-
 <h1>
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/assets/wordmark-dark.svg" />
@@ -150,3 +148,5 @@ IncidentMesh is a hackathon incident-response prototype, not a production integr
 Built for the JigJoy × daily.dev × Hyperskill concurrent-agents hackathon.
 
 [Public JigJoy entry](https://build.jigjoy.ai/gallery/incidentmesh-40ad9c) · [Judge package](docs/hackathon/) · [Full implementation notes](docs/implementation.md)
+
+<img src="docs/assets/astra-credit.svg" width="148" height="44" alt="developed with gpt-6-astra" />
