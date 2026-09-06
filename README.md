@@ -1,10 +1,6 @@
 <p align="center">
-  <img src="docs/assets/incidentmesh-mark.svg" width="96" alt="IncidentMesh mark" />
+  <img src="docs/assets/hero.svg" alt="IncidentMesh concurrent incident control: parallel responders feed shared evidence, the Safety Gate blocks rollback, and Mozaik rewrites rollback_production to request_corroboration before a canary replan" />
 </p>
-
-<h1 align="center">IncidentMesh</h1>
-
-<p align="center"><strong>Three independent investigators disagree, and that disagreement changes what the system is allowed to do.</strong></p>
 
 <p align="center">
   <a href="https://github.com/1337isnot1337/incidentmesh/actions/workflows/ci.yml"><img src="https://github.com/1337isnot1337/incidentmesh/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
@@ -15,33 +11,11 @@
 
 <p align="center">
   <a href="#demo">Demo</a> ·
-  <a href="#judge-verification">Verification</a> ·
-  <a href="#how-it-works">Architecture</a> ·
-  <a href="#measured-overlap">Measured overlap</a> ·
-  <a href="#development">Development</a>
+  <a href="#judge-verification">Verify</a> ·
+  <a href="#how-it-works">How it works</a>
 </p>
 
-<p align="center">
-  <img src="docs/assets/hero.svg" alt="IncidentMesh disagreement-to-action flow" />
-</p>
-
-IncidentMesh is a concurrent incident-response prototype built on [Mozaik](https://mozaik.jigjoy.ai/). **Trace**, **Dependency**, and **Impact** investigate different evidence streams at the same time. Their hypotheses enter one typed `IncidentState`. In the deterministic scenario, the three root-cause hypotheses are distinct, producing **two contradictions**. That aggregate disagreement blocks rollback, causes Impact to replan to a canary, and causes Trace and Dependency to add corroborating evidence.
-
-```text
-parallel investigation
-        ↓
-3 distinct root-cause hypotheses
-        ↓
-2 contradictions enter shared state
-        ↓
-SAFETY GATE: BLOCKED
-        ↓
-Impact replans → canary
-        ↓
-Trace + Dependency → corroboration
-```
-
-The default demo is deterministic and needs no API key. Its purpose is to make the concurrency and causal state transitions reproducible.
+IncidentMesh is a concurrent incident-response prototype built on [Mozaik](https://mozaik.jigjoy.ai/). In the canonical zero-key demo, **Trace**, **Dependency**, and **Impact** publish into one typed `IncidentState`; by the fixed 205 ms action boundary all three hypotheses are present, producing **two contradictions** and `SAFETY GATE: BLOCKED`. Mozaik then intercepts `rollback_production`, rewrites the executable transition to `request_corroboration`, executes the safe tool, and Impact deterministically replans to a canary.
 
 ## Demo
 
