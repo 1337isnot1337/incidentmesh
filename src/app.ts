@@ -377,7 +377,11 @@ export class IncidentState extends RuntimeState {
     targetCause?: string | null
   }): ActionAttemptSnapshot {
     const attemptId = `attempt-${++this.attemptSequence}`
-    const plan = input.planId === undefined || input.planId === null ? this.getActivePlan() : this.getPlan(input.planId)
+    const plan = input.planId === undefined
+      ? this.getActivePlan()
+      : input.planId === null
+        ? null
+        : this.getPlan(input.planId)
     const validProvenance = plan !== null
       && plan.producerId === input.producerId
       && this.isActionControllerProducer(input.producerId)
@@ -708,7 +712,7 @@ export function createTargetedCanaryProbeTool(onInvoke?: (args: CanaryProbeArgs)
 
 type InterceptionContext = {
   producerId?: string
-  planId?: string
+  planId?: string | null
 }
 
 export class SafetyGateInterception implements InterceptionHandler {
@@ -740,12 +744,13 @@ export class SafetyGateInterception implements InterceptionHandler {
         // A malformed target is deterministically rejected by bounded policy.
       }
     }
-    const activePlan = this.context.planId === undefined ? this.state.getActivePlan() : this.state.getPlan(this.context.planId)
-    const producerId = this.context.producerId ?? activePlan?.producerId ?? "unregistered-action-controller"
+    // Authorization context is bound by the Action Controller call site. Never
+    // let an unbound transition borrow whichever plan happens to be active.
+    const producerId = this.context.producerId ?? "unregistered-action-controller"
     const snapshot = this.state.captureActionAttempt({
       proposedAction,
       producerId,
-      planId: this.context.planId ?? activePlan?.planId,
+      planId: this.context.planId ?? null,
       targetCause,
     })
     this.state.actionProposed = true
@@ -947,7 +952,7 @@ function responderHandlers(
           tools: [],
           structuredOutput: MODEL_HYPOTHESIS_OUTPUT,
           context: participant.getMemory().getContext(),
-        }, new SafetyGateInterception(state))
+        }, new SafetyGateInterception(state, { producerId: participant.getId(), planId: null }))
       },
     },
   }

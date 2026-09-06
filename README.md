@@ -172,14 +172,14 @@ A scripted `InferenceRunner` integration test exercises this lifecycle through M
 ## Verification
 
 ```bash
-npm run verify       # typecheck, 36 focused tests, production build, built smoke check
+npm run verify       # typecheck, 37 focused tests, production build, built smoke check
 npm run ablation     # causal action-boundary comparison
 npm run ablation:stale-plan # revision-stamped causal comparison
 npm run stress:safety       # 10,000 seeded schedules / 40,000 attempts
 npm run degradation  # explicit responder timeout
 ```
 
-The current suite contains **36 focused tests** covering overlap, real Mozaik interception, revision advancement, frozen planning contexts, per-attempt authorization, stale bounded/destructive rejection, bounded-policy negatives, plan/proposal provenance, complete rollback approval, fail-closed pending/conflicting/degraded states, late evidence, provider compatibility, causal scheduling, and the authenticated lifecycle's local regression path.
+The current suite contains **37 focused tests** covering overlap, real Mozaik interception, revision advancement, frozen planning contexts, per-attempt authorization, stale bounded/destructive rejection, bounded-policy negatives, explicit and unbound plan/proposal provenance, complete rollback approval, fail-closed pending/conflicting/degraded states, late evidence, provider compatibility, causal scheduling, and the authenticated lifecycle's local regression path.
 
 <details>
 <summary>Additional commands and supporting measurements</summary>

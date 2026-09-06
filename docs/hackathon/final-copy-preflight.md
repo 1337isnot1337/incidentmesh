@@ -38,7 +38,7 @@ for phrase in (
     assert phrase not in lower, f"stale claim: {phrase}"
 assert "both arms fail closed" in lower or "both rollback arms fail closed" in lower
 assert "1,389 ms" in readme
-assert "36 focused tests" in readme
+assert "37 focused tests" in readme
 assert "90-second demo guide" not in readme
 print(f"Description: {len(description)} / 2000")
 print(f"Concurrency: {len(concurrency)} / 2000")

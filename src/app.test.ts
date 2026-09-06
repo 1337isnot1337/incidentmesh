@@ -440,6 +440,29 @@ test("invalid Action Controller or plan provenance cannot authorize an action", 
   assert.equal(state.actionBoundarySnapshot?.policyReason, "invalid-plan-provenance")
 })
 
+test("unbound or responder-originated transitions cannot borrow an active Action Controller plan", async () => {
+  const state = new IncidentState()
+  for (const role of ROLES) {
+    state.registerResponder(role, `${role}-id`)
+    state.acceptHypothesis(`${role}-id`, { role, claim: role, confidence: 0.95, rootCause: "same-cause" })
+  }
+  const { plan } = registerControllerAndStartPlan(state)
+
+  const unbound = rollbackTransition("unbound-borrow-attempt")
+  const unboundResult = await new SafetyGateInterception(state).handle(unbound)
+  assert.equal((unboundResult as typeof unbound).input.call.name, "request_corroboration")
+  assert.equal(state.actionAttempts.at(-1)?.planId, "invalid-plan")
+  assert.equal(state.actionAttempts.at(-1)?.policyReason, "invalid-plan-provenance")
+
+  const responder = rollbackTransition("responder-borrow-attempt")
+  const responderResult = await new SafetyGateInterception(state, {
+    producerId: "trace-id",
+    planId: plan.planId,
+  }).handle(responder)
+  assert.equal((responderResult as typeof responder).input.call.name, "request_corroboration")
+  assert.equal(state.actionAttempts.at(-1)?.policyReason, "invalid-plan-provenance")
+})
+
 test("provider-derived stale-plan ablation changes only peer scheduling and proves the revision race", async () => {
   const evidence = [
     { role: "trace" as const, claim: "trace", confidence: 0.85, rootCause: "cause-a" },

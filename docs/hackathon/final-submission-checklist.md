@@ -22,7 +22,7 @@ git status --short
 
 Record the candidate SHA and actual test summary. Required final values:
 
-- 36 focused tests pass;
+- 37 focused tests pass;
 - 10,000 stress cases / 40,000 independent attempts;
 - unauthorized rollback crossings = 0;
 - stale non-safe crossings = 0;

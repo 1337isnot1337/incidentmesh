@@ -11,7 +11,7 @@ Repository integration branch: `sol-maxscore-final-integration`.
 - **Hard safety:** rollback passes iff its own immutable attempt is fresh and strictly approved. Bounded probes require their own fresh bounded-policy approval. Mutable live state is not an authorization fallback.
 - **Adversarial proof:** seed `0x1cedb00c`, 10,000 cases, 40,000 independent attempts, zero unauthorized rollback, bounded, or stale non-safe crossings; zero policy, isolation, or snapshot mutation violations.
 - **Semantic stability:** 25 repetitions per arm across two experiments (100 arm executions), zero semantic mismatches.
-- **Focused suite:** 36 tests plus typecheck, build, and built smoke verification.
+- **Focused suite:** 37 tests plus typecheck, build, and built smoke verification.
 
 ## Architecture status
 

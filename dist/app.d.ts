@@ -222,7 +222,7 @@ type CanaryProbeArgs = {
 export declare function createTargetedCanaryProbeTool(onInvoke?: (args: CanaryProbeArgs) => void): Tool;
 type InterceptionContext = {
     producerId?: string;
-    planId?: string;
+    planId?: string | null;
 };
 export declare class SafetyGateInterception implements InterceptionHandler {
     private readonly state;
