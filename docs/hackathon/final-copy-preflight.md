@@ -18,9 +18,11 @@ def section(title):
 
 description = section("Description")
 concurrency = section("How do the agents run concurrently?")
+demo = section("Demo/video URL")
 
 assert len(description) <= 2000, len(description)
 assert len(concurrency) <= 2000, len(concurrency)
+assert demo == "https://www.youtube.com/watch?v=ohw8Ybt_dIM", demo
 
 for name, value in (("Description", description), ("Concurrency", concurrency)):
     for marker in ("**", "`"):
@@ -58,20 +60,30 @@ for phrase in (
 
 assert "| Destructive rollback authorized | **no** | **no** |" in readme
 assert "docs/assets/gemini-proof.svg" in readme
+assert "https://www.youtube.com/watch?v=ohw8Ybt_dIM" in readme
 assert "1,389 ms" in readme
 assert "37 focused tests" in Path("docs/judge-guide.md").read_text()
 
+for path in (
+    "docs/gallery/jigjoy-01-cover.png",
+    "docs/gallery/jigjoy-02-ablation.png",
+    "docs/gallery/jigjoy-03-interception.png",
+    "docs/gallery/jigjoy-04-safety-proof.png",
+):
+    assert Path(path).is_file(), f"missing screenshot: {path}"
+
 print(f"Description: {len(description)} / 2000")
 print(f"Concurrency: {len(concurrency)} / 2000")
+print(f"Demo URL: {demo}")
 print("Current proof claims: PASS")
 PY
 ```
 
-Upload screenshots in this exact order unless the final video/submission plan intentionally changes them:
+Upload screenshots in this exact order:
 
 1. `docs/gallery/jigjoy-01-cover.png`
 2. `docs/gallery/jigjoy-02-ablation.png`
 3. `docs/gallery/jigjoy-03-interception.png`
 4. `docs/gallery/jigjoy-04-safety-proof.png`
 
-Preserve any existing public video/deployment URL during resubmission. Add the final public video URL once the recording is approved. After submitting, compare the public detail record—not merely the success toast—with the fields above.
+The approved final demo URL is `https://www.youtube.com/watch?v=ohw8Ybt_dIM`. After resubmitting, compare the logged-out public detail record—not merely the success toast—with the fields above.

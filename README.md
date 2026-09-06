@@ -18,7 +18,15 @@ If new evidence arrives before that plan acts, IncidentMesh compares the revisio
 
 **Concurrency changes which decisions are still valid.**
 
-[Quick start](#quick-start) · [Why concurrency matters](#why-concurrency-matters) · [Real Gemini run](#one-real-gemini-run) · [Evidence](#evidence) · [Judge guide](docs/judge-guide.md)
+[Watch the demo](https://www.youtube.com/watch?v=ohw8Ybt_dIM) · [Quick start](#quick-start) · [Why concurrency matters](#why-concurrency-matters) · [Real Gemini run](#one-real-gemini-run) · [Evidence](#evidence) · [Judge guide](docs/judge-guide.md)
+
+## Watch the 83-second demo
+
+<a href="https://www.youtube.com/watch?v=ohw8Ybt_dIM">
+  <img src="https://i.ytimg.com/vi/ohw8Ybt_dIM/maxresdefault.jpg" width="960" alt="IncidentMesh demo thumbnail: PLAN REV 1 differs from STATE REV 3, so the plan is STALE." />
+</a>
+
+**[Watch on YouTube](https://www.youtube.com/watch?v=ohw8Ybt_dIM)** — stale-plan invalidation, authenticated Gemini overlap, real Mozaik interception, and the seeded safety stress in one short walkthrough.
 
 ## The idea
 
@@ -128,6 +136,7 @@ Built directly on **Mozaik 4.0.5** using typed shared state, independent partici
 
 | Question | Best artifact |
 | --- | --- |
+| What is the fastest overview? | [83-second video demo](https://www.youtube.com/watch?v=ohw8Ybt_dIM) |
 | Did real model requests overlap? | [Authenticated Gemini receipt](docs/evidence/real-provider-run.md) |
 | Does concurrency change what action is valid? | [Stale-plan ablation](docs/evidence/stale-plan-ablation.md) |
 | Does Mozaik actually intercept the action? | [Canonical replay](docs/evidence/replay.svg) |
@@ -150,6 +159,6 @@ IncidentMesh is a hackathon incident-response prototype, not a production integr
 
 Built for the JigJoy × daily.dev × Hyperskill concurrent-agents hackathon.
 
-[Public JigJoy entry](https://build.jigjoy.ai/gallery/incidentmesh-40ad9c) · [Judge package](docs/hackathon/) · [Full implementation notes](docs/implementation.md)
+[Public JigJoy entry](https://build.jigjoy.ai/gallery/incidentmesh-40ad9c) · [Video demo](https://www.youtube.com/watch?v=ohw8Ybt_dIM) · [Judge package](docs/hackathon/) · [Full implementation notes](docs/implementation.md)
 
 <img src="docs/assets/astra-credit.svg" width="148" height="44" alt="developed with gpt-6-astra" />
