@@ -54,6 +54,7 @@ export type GateReason =
   | "incomplete-required-evidence"
   | "conflicting-evidence"
   | "low-confidence-evidence"
+  | "degraded-required-responder"
   | "sufficient-consistent-evidence"
 export type BoundarySafeAction =
   | "rollback-approved"
@@ -1274,6 +1275,9 @@ export function evaluateSafetyGate(
       return { decision: "blocked", reason: "incomplete-required-evidence", confidence, contradictions, availableRoles, missingRequiredRoles }
     }
     return { decision: "pending", reason: "pending-required-evidence", confidence, contradictions, availableRoles, missingRequiredRoles }
+  }
+  if (degradedRoles.length > 0) {
+    return { decision: "blocked", reason: "degraded-required-responder", confidence, contradictions, availableRoles, missingRequiredRoles }
   }
   if (contradictions > 0) {
     return { decision: "blocked", reason: "conflicting-evidence", confidence, contradictions, availableRoles, missingRequiredRoles }

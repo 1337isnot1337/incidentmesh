@@ -476,6 +476,24 @@ test("degraded responders are closed for the current action phase", () => {
   assert.equal(evaluateSafetyGate(state.hypotheses, state.degradedRoles).decision, "blocked")
 })
 
+test("a required responder closing after evidence cannot leave rollback authorized", async () => {
+  const state = new IncidentState()
+  for (const role of ROLES) {
+    state.registerResponder(role, `${role}-id`)
+    state.acceptHypothesis(`${role}-id`, { role, claim: role, confidence: 0.95, rootCause: "same-cause" })
+  }
+  state.registerActionController("controller-id")
+  assert.equal(evaluateSafetyGate(state.hypotheses, state.degradedRoles, "action-boundary").decision, "approved")
+  assert.equal(state.markDegraded("impact"), true)
+  assert.equal(evaluateSafetyGate(state.hypotheses, state.degradedRoles, "action-boundary").reason, "degraded-required-responder")
+  const plan = state.startPlan("controller-id")
+  assert.ok(plan)
+  const result = await new SafetyGateInterception(state, { producerId: "controller-id", planId: plan.planId })
+    .handle(rollbackTransition("closed-after-evidence"))
+  assert.equal((result as ReturnType<typeof rollbackTransition>).input.call.name, "request_corroboration")
+  assert.equal(state.actionBoundarySnapshot?.policyReason, "degraded-required-responder")
+})
+
 function seededRandom(seed: number): () => number {
   let state = seed >>> 0
   return () => {
