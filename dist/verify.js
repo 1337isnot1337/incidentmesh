@@ -6,4 +6,6 @@ assert.equal(report.hypotheses.length, 3);
 assert.equal(overlapCount(report), 3);
 assert.equal(report.gateDecision, "blocked");
 assert.equal(report.evidence.length, 2);
-console.log(JSON.stringify({ ok: true, schema: report.schema, overlapPairs: overlapCount(report), gate: report.gateDecision }));
+assert.equal(report.adaptations.length, 1);
+assert.equal(report.timeline.some((item) => item.type === "incident.scenario.timeout"), false);
+console.log(JSON.stringify({ ok: true, schema: report.schema, overlapPairs: overlapCount(report), gate: report.gateDecision, evidence: report.evidence.length }));

@@ -76,6 +76,29 @@ export class IncidentState extends RuntimeState {
   contradictions = 0
   followupRequested = false
   onTrace?: (event: TimelineEvent) => void
+  private readonly changeListeners = new Set<() => void>()
+
+  private notifyChange(): void {
+    for (const listener of this.changeListeners) listener()
+  }
+
+  async waitFor(predicate: () => boolean, timeoutMs: number): Promise<boolean> {
+    if (predicate()) return true
+    return await new Promise<boolean>((resolve) => {
+      let timer: ReturnType<typeof setTimeout> | undefined
+      const finish = (result: boolean) => {
+        if (timer !== undefined) clearTimeout(timer)
+        this.changeListeners.delete(check)
+        resolve(result)
+      }
+      const check = () => {
+        if (predicate()) finish(true)
+      }
+      this.changeListeners.add(check)
+      timer = setTimeout(() => finish(false), timeoutMs)
+      check()
+    })
+  }
 
   record(type: string, producer: string, detail: string): void {
     const participant = this.getParticipant(producer)
@@ -83,6 +106,7 @@ export class IncidentState extends RuntimeState {
     const event = { atMs: Math.round(performance.now() - this.startedAt), type, producer: label, detail }
     this.timeline.push(event)
     this.onTrace?.(event)
+    this.notifyChange()
   }
 
   toReport(): IncidentReport {
@@ -172,15 +196,37 @@ const rollbackTool: Tool = {
   }),
 }
 
+export const requestCorroborationTool: Tool = {
+  type: "function",
+  name: "request_corroboration",
+  description: "Record that a proposed production action needs corroboration before it can proceed.",
+  parameters: {
+    type: "object",
+    properties: { originalAction: { type: "string" }, reason: { type: "string" } },
+    required: ["originalAction", "reason"],
+    additionalProperties: false,
+  },
+  strict: true,
+  invoke: async (args: { originalAction: string; reason: string }) => ({
+    status: "blocked-pending-corroboration",
+    originalAction: args.originalAction,
+    reason: args.reason,
+  }),
+}
+
+const responderTools: Tool[] = [rollbackTool, requestCorroborationTool]
+
 export class SafetyGateInterception implements InterceptionHandler {
   constructor(private readonly state: IncidentState) {}
 
   isSatisfiedBy(transition: ExecutableTransition): boolean {
-    return transition.nextStateId === "function_call"
+    return this.state.gateDecision === "blocked"
+      && transition.nextStateId === "function_call"
+      && transition.input.call.name === "rollback_production"
   }
 
   async handle(transition: ExecutableTransition): Promise<ExecutableTransition> {
-    if (transition.nextStateId !== "function_call" || this.state.gateDecision !== "blocked") {
+    if (!this.isSatisfiedBy(transition) || transition.nextStateId !== "function_call") {
       return transition
     }
     const functionCallTransition = transition as Extract<ExecutableTransition, { nextStateId: "function_call" }>
@@ -203,8 +249,8 @@ function responderPrompt(role: Role, state: IncidentState): string {
   return [
     `You are ${ROLE_CONFIG[role].name}, the ${role} responder in IncidentMesh.`,
     `Incident: ${state.incident}. Other participants: ${roster}.`,
-    "Publish one concise claim with confidence and the evidence you would verify next.",
-    "React to peer claims; do not treat an unverified claim as fact. If proposing rollback, use the rollback_production tool so the Safety Gate can inspect it.",
+    "Return one concise incident hypothesis with a claim, confidence from 0 to 1, and a short root-cause slug.",
+    "Do not treat an unverified peer claim as fact. If proposing rollback, use the rollback_production tool so the Safety Gate can inspect it.",
   ].join(" ")
 }
 
@@ -212,6 +258,41 @@ function modelAnswerText(payload: unknown): string {
   const candidate = payload as { answer?: { content?: { text?: unknown } } }
   return typeof candidate.answer?.content?.text === "string" ? candidate.answer.content.text : "model answer unavailable"
 }
+
+type ModelHypothesis = Pick<Hypothesis, "claim" | "confidence" | "rootCause">
+
+export function parseModelHypothesis(payload: unknown, role: Role): ModelHypothesis {
+  const text = modelAnswerText(payload)
+  try {
+    const parsed = JSON.parse(text) as { claim?: unknown; confidence?: unknown; rootCause?: unknown }
+    if (typeof parsed.claim === "string" && typeof parsed.confidence === "number" && Number.isFinite(parsed.confidence)
+      && typeof parsed.rootCause === "string") {
+      return {
+        claim: parsed.claim,
+        confidence: Math.max(0, Math.min(1, parsed.confidence)),
+        rootCause: parsed.rootCause,
+      }
+    }
+  } catch {
+    // Keep provider mode observable even if a custom model ignores the structured-output contract.
+  }
+  return { claim: text, confidence: 0.5, rootCause: `model-unparsed-${role}` }
+}
+
+const MODEL_HYPOTHESIS_OUTPUT = {
+  name: "incident_hypothesis",
+  schema: {
+    type: "object",
+    properties: {
+      claim: { type: "string" },
+      confidence: { type: "number", minimum: 0, maximum: 1 },
+      rootCause: { type: "string" },
+    },
+    required: ["claim", "confidence", "rootCause"],
+    additionalProperties: false,
+  },
+  strict: true,
+} as const
 
 function responderHandlers(
   role: Role,
@@ -246,7 +327,8 @@ function responderHandlers(
         runLoop(participant.getId(), responderPrompt(role, state), {
           model,
           maxOutputTokens,
-          tools: [rollbackTool],
+          tools: participant.getTools(),
+          structuredOutput: MODEL_HYPOTHESIS_OUTPUT,
           context: participant.getMemory().getContext(),
         }, new SafetyGateInterception(state))
       },
@@ -257,11 +339,9 @@ function responderHandlers(
     specification: isPeerType(HYPOTHESIS_EMITTED),
     processor: {
       apply({ event: incoming }) {
-        if (dryRun) {
-          const payload = incoming.payload as EventPayload
-          const sourceRole = typeof payload.role === "string" ? payload.role : "peer"
-          state.record("awareness.peer-observed", config.name, `${config.name} observed ${sourceRole} while active`)
-        }
+        const payload = incoming.payload as EventPayload
+        const sourceRole = typeof payload.role === "string" ? payload.role : "peer"
+        state.record("awareness.peer-observed", config.name, `${config.name} observed ${sourceRole} hypothesis`)
       },
     },
   }
@@ -275,9 +355,9 @@ function responderHandlers(
     processor: {
       apply({ participant, event: answerEvent }) {
         if (dryRun) return
-        const claim = modelAnswerText(answerEvent.payload)
+        const hypothesis = parseModelHypothesis(answerEvent.payload, role)
         sendEvent(event(HYPOTHESIS_EMITTED, participant.getId(), {
-          role, claim, confidence: 0.7, rootCause: "model-reported",
+          role, ...hypothesis,
         }), participant.getId())
         sendEvent(event(SPAN_COMPLETED, participant.getId(), { role, detail: "model response complete" }), participant.getId())
       },
@@ -382,6 +462,7 @@ export type ScenarioOptions = {
   dryRun?: boolean
   model?: string
   maxOutputTokens?: number
+  timeoutMs?: number
   trace?: (event: TimelineEvent) => void
 }
 
@@ -400,7 +481,7 @@ export async function runIncidentScenario(options: ScenarioOptions = {}): Promis
     name: ROLE_CONFIG[role].name,
     capabilities: [ROLE_CONFIG[role].capability, "concurrent-response"],
     instruction: `You are the ${role} responder. Work independently, publish evidence, and react to peer events.`,
-    tools: [],
+    tools: responderTools,
     handlers: responderHandlers(role, state, dryRun, model, maxOutputTokens, runLoop, sendEvent),
   }))
   const human = createHuman({ name: "Incident Commander", capabilities: ["incident-input"], handlers: [] })
@@ -410,14 +491,27 @@ export async function runIncidentScenario(options: ScenarioOptions = {}): Promis
     incident: state.incident,
     summary: "Checkout failures are rising in us-east; investigate and choose a safe mitigation.",
   }), human.getId())
-  await sleep(dryRun ? 650 : 1500)
+
+  const timeoutMs = options.timeoutMs ?? (dryRun ? 2_000 : 30_000)
+  const settled = await state.waitFor(() => {
+    const respondersComplete = ROLES.every((role) => state.spans.get(role)?.completedAtMs !== undefined)
+    if (!respondersComplete || state.gateDecision === "pending") return false
+    if (state.gateDecision === "blocked" && state.adaptations.length === 0) return false
+    if (dryRun && state.gateDecision === "blocked" && state.evidence.length < 2) return false
+    return true
+  }, timeoutMs)
+  if (!settled) {
+    state.record("incident.scenario.timeout", "Incident Console", `scenario did not settle within ${timeoutMs}ms`)
+  }
   return state.toReport()
 }
 
 export function concurrencySpeedup(report: IncidentReport): number {
   const completed = report.spans.filter((span) => span.completedAtMs !== undefined)
   if (completed.length === 0) return 0
-  const concurrentWall = Math.max(...completed.map((span) => span.completedAtMs ?? 0))
+  const concurrentStart = Math.min(...completed.map((span) => span.startedAtMs))
+  const concurrentEnd = Math.max(...completed.map((span) => span.completedAtMs ?? span.startedAtMs))
+  const concurrentWall = concurrentEnd - concurrentStart
   const sequentialWall = completed.reduce((sum, span) => sum + ((span.completedAtMs ?? 0) - span.startedAtMs), 0)
   return concurrentWall > 0 ? Number((sequentialWall / concurrentWall).toFixed(2)) : 0
 }

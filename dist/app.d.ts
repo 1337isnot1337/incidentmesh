@@ -1,5 +1,5 @@
 import { RuntimeState } from "@mozaik-ai/core";
-import type { ExecutableTransition, InterceptionHandler } from "@mozaik-ai/core";
+import type { ExecutableTransition, InterceptionHandler, Tool } from "@mozaik-ai/core";
 export declare const INCIDENT_OPENED = "incident.opened";
 export declare const SPAN_STARTED = "incident.span.started";
 export declare const HYPOTHESIS_EMITTED = "incident.hypothesis.emitted";
@@ -54,21 +54,29 @@ export declare class IncidentState extends RuntimeState {
     contradictions: number;
     followupRequested: boolean;
     onTrace?: (event: TimelineEvent) => void;
+    private readonly changeListeners;
+    private notifyChange;
+    waitFor(predicate: () => boolean, timeoutMs: number): Promise<boolean>;
     record(type: string, producer: string, detail: string): void;
     toReport(): IncidentReport;
 }
+export declare const requestCorroborationTool: Tool;
 export declare class SafetyGateInterception implements InterceptionHandler {
     private readonly state;
     constructor(state: IncidentState);
     isSatisfiedBy(transition: ExecutableTransition): boolean;
     handle(transition: ExecutableTransition): Promise<ExecutableTransition>;
 }
+type ModelHypothesis = Pick<Hypothesis, "claim" | "confidence" | "rootCause">;
+export declare function parseModelHypothesis(payload: unknown, role: Role): ModelHypothesis;
 export type ScenarioOptions = {
     dryRun?: boolean;
     model?: string;
     maxOutputTokens?: number;
+    timeoutMs?: number;
     trace?: (event: TimelineEvent) => void;
 };
 export declare function runIncidentScenario(options?: ScenarioOptions): Promise<IncidentReport>;
 export declare function concurrencySpeedup(report: IncidentReport): number;
 export declare function overlapCount(report: IncidentReport): number;
+export {};

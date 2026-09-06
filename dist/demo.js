@@ -1,5 +1,5 @@
 import { concurrencySpeedup, overlapCount, runIncidentScenario } from "./app.js";
-console.log("\nINCIDENTMESH // LIVE CONCURRENT RESPONSE ROOM");
+console.log("\nINCIDENTMESH // CONCURRENT INCIDENT RESPONSE");
 console.log("Incident: checkout-api-us-east — 38% checkout failures in us-east");
 console.log("\nThe room opens one event. Three independent responders start immediately.\n");
 const report = await runIncidentScenario({
@@ -18,8 +18,8 @@ for (const span of report.spans) {
     const width = Math.max(1, Math.round((end - span.startedAtMs) / 8));
     console.log(`${span.role.padEnd(11, " ")} ${"█".repeat(width)} ${span.startedAtMs}–${end}ms`);
 }
-console.log(`concurrency speedup proxy: ${concurrencySpeedup(report)}× sequential work / wall time`);
+console.log(`latency proxy: ${concurrencySpeedup(report)}× summed responder work / concurrent wall time`);
 console.log(`gate: ${report.gateDecision.toUpperCase()} — ${report.contradictions} conflicting causes at ${report.confidence.toFixed(2)} confidence`);
 console.log(`adaptation: ${report.adaptations[0] ?? "none"}`);
 console.log(`evidence added after adaptation: ${report.evidence.length}`);
-console.log("\nFinal recommendation: canary the mitigation and require corroboration before rollback.");
+console.log("\nFinal recommendation: proceed with the corroborated canary plan; keep rollback blocked.");
