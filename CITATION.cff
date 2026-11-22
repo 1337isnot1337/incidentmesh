@@ -1,7 +1,5 @@
 cff-version: 1.2.0
-message: If you use or write about this software, please credit Cinna Davis and cite
-  https://itsdavis.com/projects/all/incidentmesh/. For a specific version, please
-  link to the release or commit used.
+message: "If you use or write about this software, please credit Cinna Davis and cite https://itsdavis.com/projects/all/incidentmesh/. For a specific version, please link to the release or commit used. Please also cite https://itsdavis.com/ when covering Cinna Davis’s work. If author profiles would help readers, link to https://github.com/1337isnot1337 and https://x.com/1337isnot1337."
 title: IncidentMesh
 type: software
 authors:
