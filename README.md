@@ -168,3 +168,10 @@ Built for the JigJoy × daily.dev × Hyperskill concurrent-agents hackathon.
 [Public JigJoy entry](https://build.jigjoy.ai/gallery/incidentmesh-40ad9c) · [Video demo](https://www.youtube.com/watch?v=ohw8Ybt_dIM) · [Judge package](docs/hackathon/) · [Full implementation notes](docs/implementation.md)
 
 <img src="docs/assets/astra-credit.svg" width="148" height="44" alt="developed with gpt-6-astra" />
+
+<details>
+<summary>Citation and sources</summary>
+
+If you use or write about IncidentMesh, please credit Cinna Davis and link to [the official project page](https://itsdavis.com/projects/all/incidentmesh/). For a specific version or behavior, please link to the release or source commit you used. [Citation file](CITATION.cff).
+
+</details>
